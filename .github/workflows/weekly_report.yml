@@ -1,47 +1,56 @@
-name: Weekly Tech Report Agent
+name: Daily Tech Report Agent
 
 on:
   schedule:
-    # 設定每週一早上 01:00 UTC (即台灣時間早上 09:00) 自動執行
-    - cron: '0 1 * * 1'
-  workflow_dispatch: # 允許你隨時手動在 GitHub 網頁上點擊按鈕執行測試
+    # 台灣週二早上 09:00 -> UTC 週一 01:00 (1)
+    # 台灣週四早上 09:00 -> UTC 週三 01:00 (3)
+    # 台灣週日早上 09:00 -> UTC 週六 01:00 (6)
+    - cron: '0 1 * * 1,3,6'
+  
+  workflow_dispatch: # 允許手動觸發
+    inputs:
+      forced_domain:
+        description: '手動測試時，想強制執行的領域'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto      # 讓程式自動依據當天星期幾決定
+          - ai        # 強制跑 AI 前沿技術
+          - security  # 強制跑 資訊安全維度
+          - software  # 強制跑 工作軟體技術
 
 permissions:
-  contents: write # 必須賦予 Actions 權限，它才能把生成的報告寫回你的專案
+  contents: write
 
 jobs:
   build-and-run:
     runs-on: ubuntu-latest
-
     steps:
-    # 1. 檢出程式碼
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2. 設定 Python 環境
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
-    # 3. 安裝依賴套件
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 4. 執行 Agent 腳本
     - name: Run Tech Agent
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        # 將手動輸入的參數傳給 Python，如果是自動排程，預設會是 'auto'
+        FORCED_DOMAIN: ${{ github.event.inputs.forced_domain || 'auto' }}
       run: python agent.py
 
-    # 5. 自動將產生的週報檔案 Git Commit & Push 回儲存庫
     - name: Commit and push report
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git add reports/
-        # 如果當天完全沒有內容變更，git commit 會失敗，加上 || exit 0 可確保 workflow 正常結束
         git commit -m "Auto-generated technical report $(date +'%Y-%m-%d')" || exit 0
         git push
