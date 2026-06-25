@@ -79,7 +79,7 @@ def main():
     print(f"正在執行 Agent... 今日聚焦主題：{domain.upper()}")
     
     response = client.models.generate_content(
-        model='gemini-2.5-pro',
+        model='gemini-2.5-flash',
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
