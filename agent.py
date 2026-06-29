@@ -17,11 +17,11 @@ def get_target_domain():
     now_tw = datetime.datetime.now(tw_tz)
     weekday = now_tw.weekday()  # 0=週一, 1=週二, 2=週三, 3=週四, 4=週五, 5=週六, 6=週日
 
-    if weekday == 1:    # 週二
+    if weekday in (1, 2):       # 週二、週三
         return "ai"
-    elif weekday == 3:  # 週四
+    elif weekday in (3, 4, 5):  # 週四、週五、週六
         return "security"
-    elif weekday == 6:  # 週日
+    elif weekday in (0, 6, 7):  # 週一、週日（依模組而定）
         return "software"
     else:
         return "all"    # 非預期日子執行時，預設整理全部
