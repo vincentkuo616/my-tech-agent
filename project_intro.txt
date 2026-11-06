@@ -1,745 +1,1092 @@
 專案簡介
 
-# MESClient
+# RD2017004-MESClient
 
-MES（製造執行系統）Client 端，前後端同在一個 Web 專案中。
+凌聚農業 MES（製造執行系統）Client 端，前後端同在一個 Web 專案中。
+業務資料（製令、製程、庫存、人員、下拉選項）幾乎都來自 ERP（RD2017004-ERP-Web）的 api/Version1/*，本專案自有資料表很少。
 
 ## 技術棧
 
-  ┌──────────────┬──────────────────────────────────────────────┐
-  │ 項目         │ 內容                                         │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 框架         │ ASP.NET Core (.NET 9)                        │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 架構         │ MVC（Razor Views）+ API Controllers          │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ ORM          │ Entity Framework Core 9 + SQL Server         │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 前端         │ Kendo UI（MVVM）+ Bootstrap + jQuery + ES6   │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ DI/AOP       │ AspectCore（動態代理）+ 自動註冊(AddAutoDi)  │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 認證/授權    │ JWT + 自訂 PermissionAuthorizationHandler    │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 安全         │ AntiXss Middleware + RateLimiting + CSP      │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 排程         │ Hangfire（SQL Server 儲存）                  │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 快取         │ Redis (StackExchange) / 可退回 MemoryCache   │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 錯誤監控     │ Elmah + Elastic APM（二擇一，互斥）          │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ API 文件     │ Swagger (Swashbuckle)                        │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 日誌         │ NLog（寫入DB: SystemLog / EventLog /         │
-  │              │   TrackTransaction） + JSNLog（前端→後端）   │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 多語系       │ .resx 資源檔 + CultureMiddleware             │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 程式碼生成   │ T4 模板（Enum/Resource → JS 同步）           │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 前端打包     │ Gulp（ES Module import 路徑加版本戳）        │
-  ├──────────────┼──────────────────────────────────────────────┤
-  │ 即時通訊     │ SignalR                                      │
-  └──────────────┴──────────────────────────────────────────────┘
+    ┌──────────────┬──────────────────────────────────────────────┐
+    │ 項目         │ 內容                                         │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 框架         │ ASP.NET Core (.NET 9)                        │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 架構         │ MVC（Razor Views）+ API Controllers          │
+    │              │ JSON 序列化：Newtonsoft.Json                 │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ ORM          │ Entity Framework Core 9 + SQL Server         │
+         │ Kendo UI 2021.3（jQuery 版，MVVM）           │
+    │              │ + Bootstrap 5.3 + jQuery 3.7 + ES6 Module    │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ DI/AOP       │ AspectCore（動態代理）+ 自動註冊(AddAutoDi)  │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 認證/授權    │ Cookie 內裝 JWT（另支援 JwtBearer）          │
+    │              │ + 自訂 PermissionAuthorizationHandler        │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ HTTP 呼叫    │ HttpClientFactory（統一由 LCApiLogics 發送） │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 安全         │ AntiXss Middleware（全域）                   │
+    │              │ + HSTS（非 Development 環境）                │
+    │              │ + 安全標頭（CSP 僅設 frame-ancestors）       │
+    │              │ 註：RateLimiting 已實作，目前無端點啟用      │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 排程         │ Hangfire（SQL Server 儲存）                  │
+    │              │ + Hangfire.Console / Dashboard.Management    │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 快取         │ Redis (StackExchange) / 可退回 MemoryCache   │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 錯誤監控     │ Elmah（存 SQL）+ Elastic APM（二擇一，互斥） │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ API 文件     │ Swagger (Swashbuckle)                        │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 日誌         │ NLog（寫入 DB，4 個目標：SystemLog /         │
+    │              │   SystemEventLog / SystemTrackTransaction /  │
+    │              │   UpdateExecutedTime）                       │
+    │              │ + JSNLog（自動攔截前端錯誤，送回後端）       │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 稽核         │ EF SaveChanges 覆寫：記錄欄位異動            │
+    │              │ + AOP 事件紀錄（目前只掛在 UserAuthService） │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 多語系       │ .resx 資源檔（5 語系）+ CultureMiddleware    │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 程式碼生成   │ T4 模板（Resource / Enum → JS 同步）         │
+    │              │   根目錄 CSV → .resx + SharedResource.cs     │
+    │              │   → Resources.js；4 組 Enum → JS             │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 前端打包     │ Gulp（ES Module import 路徑加版本戳）        │
+    ├──────────────┼──────────────────────────────────────────────┤
+    │ 列印/裝置    │ SignalR 前端 client：連外部 Kiosk 列印小工具 │
+    │              │   (/deviceHub) 送列印；本專案不自建 Hub      │
+    │              │ + html5-qrcode 掃碼、getUserMedia 相機       │
+    │              │ + PWA manifest、原生 App deep link           │
+    └──────────────┴──────────────────────────────────────────────┘
 
 ## Solution 分層結構（4 層 + 測試）
 
-  src/
-  ├── Layer1（共用基礎）
-  │   ├── LC.Core/        — 共用工具、Enums、Filters、Middlewares、認證
-  │   └── Resource/       — .resx 多語系資源檔
-  │
-  ├── Layer2（資料/領域）
-  │   ├── Domain/         — 實體(Entities)、Enums、ViewModels、AOP、Middleware
-  │   ├── DbContexts/     — EF Core DbContext + Migrations
-  │   ├── Auths/          — 模組權限定義（Module GUID、Attribute）
-  │   └── LCApiLogics/    — LC 平台 API 邏輯
-  │
-  ├── Layer3（業務邏輯）
-  │   ├── MenuLogics/     — 選單邏輯
-  │   ├── ModuleLogics/   — 模組樹解析
-  │   ├── ComboLogics/    — 下拉選單邏輯
-  │   ├── CommonLogics/   — 通用業務邏輯
-  │   ├── FileLogics/     — 檔案處理邏輯
-  │   └── LCERPApiLogics/ — ERP API 整合邏輯
-  │
-  ├── Layer4（服務層）
-  │   ├── AuthServices/       — 使用者/角色/選單 服務 + EventAOP
-  │   ├── SSServices/         — 系統設定/事件日誌 服務
-  │   ├── FileServices/       — 檔案服務
-  │   ├── LCERPApiServices/   — ERP API 服務（HttpClient 封裝）
-  │   └── ERPBoardServices/   — ERP 看板服務
-  │
-  └── WebSite（主 Web 應用）
-      ├── Controllers/        — MVC Controllers（18 個，回傳 View）
-      ├── ApiControllers/     — API Controllers（19 個，回傳 JSON）
-      ├── Views/              — Razor Views（16 個功能模組）
-      ├── Filters/            — 全域過濾器（Exception / Auth）
-      ├── Job/                — Hangfire 排程任務
-      ├── wwwroot/js/         — 前端 JS（ES6 模組化 + Kendo 擴充）
-      └── _Design/            — 前端設計稿/原始資源
+    ▎ 說明：以下 src/、Layer1~4、test/ 為 Visual Studio 方案（Solution）的虛擬分層資料夾；磁碟上各專案實際平鋪於 repo 根目錄（如 LC.Core\、Domain\、WebSite\）。
 
-  test/
-  ├── ServiceLayer.Tests/     — 服務層測試
-  └── AuthServices.Tests/     — 認證服務測試
+    src/
+    ├── Layer1（共用基礎）
+    │   ├── LC.Core/        — 共用工具、Enums、全域 Filters（ExceptionFilter 等）、AntiXss Middleware、認證
+    │   └── Resource/       — .resx 多語系資源檔（T4 產物，禁止手改）
+    │
+    ├── Layer2（資料/領域）
+    │   ├── Domain/         — 實體(Entities)、Enums、ViewModels、AOP、Middlewares（Culture / RateLimiting）
+    │   ├── DbContexts/     — EF Core DbContext + Migrations
+    │   ├── Auths/          — 模組權限、選單、API 識別碼定義（Module / Menu / ApiGuid）
+    │   └── LCApiLogics/    — 共用 HTTP 呼叫（GetApi / PostApi，HttpClientFactory）
+    │
+    ├── Layer3（業務邏輯）
+    │   ├── MenuLogics/     — 選單邏輯
+    │   ├── ModuleLogics/   — 模組樹解析
+    │   ├── ComboLogics/    — 下拉選單邏輯
+    │   ├── CommonLogics/   — 通用業務邏輯（單據相關）
+    │   ├── FileLogics/     — 檔案處理邏輯
+    │   └── LCERPApiLogics/ — 逐支對應 ERP API：組網址、管 ERP 登入憑證、檢查回應，回傳 LCERP_*
+    │
+    ├── Layer4（服務層）
+    │   ├── AuthServices/       — 使用者/角色/選單 服務 + EventAOP
+    │   ├── SSServices/         — 系統設定/事件日誌/模組下拉 服務
+    │   ├── FileServices/       — 檔案服務
+    │   ├── LCERPApiServices/   — 把 LCERP_* 轉成前端用的 VM_*（每個用例一個 Service）
+    │   └── ERPBoardServices/   — ERP 看板服務（派工 / 排程 / 戰情室）
+    │
+    └── WebSite（主 Web 應用）
+        ├── Controllers/        — MVC Controllers（18 個，回傳 View；例外見下方說明）
+        ├── ApiControllers/     — API Controllers（19 個，回傳 JSON）
+        ├── Views/              — Razor Views（15 個資料夾 + Shared，含 Error / Home / MyProfile）
+        ├── Filters/            — 權限檢查（AuthFilter + PermissionAuthorizationHandler）、Hangfire 後台存取限制
+        ├── Job/                — Hangfire 排程任務（目前只有 ClearExpiredJWT）
+        ├── wwwroot/js/         — 前端 JS（ES6 模組化 + Kendo 擴充）
+        └── _Design/            — 切版原始檔（經 gulp 編譯後輸出到 wwwroot/css、images、js）
+
+    ▎ Controllers 例外：ManifestController 回 JSON（PWA manifest）、SelectorController 為空類別、RoleController 的畫面檔已於 2024-10 刪除。
+
+    test/                       （xUnit + Moq + EF InMemory）
+    ├── ServiceLayer.Tests/     — 服務層測試（目前只有抽象基底類別）
+    └── AuthServices.Tests/     — 認證服務測試（目前沒有測試案例）
 
 ## 主要功能模組
 
-  製程報工(ManufactureProcess)、派工看板(DispatchBoard)、
-  排程看板(ScheduleBoard)、工單看板(TaskBoard)、派工總覽(DispatchOverview)、
-  工單總覽(TaskOverview)、檢驗時效(InspectionTiming)、
-  綜合報表(CombinedReporting)、攝影機(Camera)、
-  使用者/角色管理(User/Role)、系統設定(SysOption)、事件日誌(EventLog)
+    製程紀錄/生產報工(ManufactureProcess)
+        └ 子頁：批次報工（列表/確認/領料）、掃描追溯（領料/退料）、製程合併產量頁；產量頁含封箱列印
+    製程合併(CombinedReporting)、
+    任務總覽(TaskOverview：製令總覽/製程總覽/生產線總覽)、派工總覽(DispatchOverview)、
+    派工看板(DispatchBoard)、排程看板(ScheduleBoard)、戰情室看板(TaskBoard)、
+    點檢提醒(InspectionTiming)、相機(Camera)、
+    人員帳號管理(User)、系統選單設定(SysOption)、系統使用紀錄(EventLog)、個人資料管理(MyProfile)
+
+    ▎ 角色管理(Role)：後端 Controller / API / JS 仍在，但畫面檔已於 2024-10 刪除。
 
 ## 開發重點注意
 
-  - DI 自動註冊：以 "Logic" / "Service" 結尾的類別自動掃描注入
-  - 前端 JS 改動後，發佈時需跑 `npx gulp release` 加版本戳
-  - Elmah 與 ElasticAPM 互斥，由 appsettings 的 ElasticApm:Enabled 控制
-  - Redis 連線可選，未設定時退回 MemoryCache
-  - JWT 金鑰持久化到 DB（DataProtection PersistKeysToDbContext）
+    - 要確認 ERP 端的行為時，回 ERP 專案讀原始碼，不要只憑本專案的 LCERP_* 欄位名推測
+    - DI 自動註冊：類別與介面名稱都以 "Logic" / "Service" 結尾即自動掃描注入 (AddAutoDi)，
+        預設 Scoped，可用 [AutoInject] 改生命週期
+    - 前端 JS 改動後，發佈時需跑 `npx gulp release` 加版本戳（gulpfile.js
+        （WebSite.csproj 已於 BeforePublish 自動執行 npm install + npx gulp release）
+        它會直接改寫 wwwroot 原始檔，且重複執行會疊加 ?v=，產生的差異不要提交
+    - 多語系文字來源是根目錄的 SharedResource(RD2017004-製程報工).csv；
+        .resx / Resources.js / Enums/*.js 都是 T4 產物，不可手改（走 AddResource.ps1 → BuildResources.ps1）
+    - Elmah 與 ElasticAPM 互斥，由 appsettings 的 ElasticApm:Enabled 控制
+        （Elmah 只在此鍵存在且為 false 時才註冊；appsettings.json / Produ
+    - Redis 連線可選（ConnectionStrings:RedisConnection），未設定時退回 MemoryCache
+    - 資料保護金鑰（DataProtection key ring）持久化到 DB（PersistKeysToDb表）；
+        JWT 簽章金鑰來自設定 Tokens:IssuerSigningKey，已簽發的 JWT 記錄在 LoginUesrJWT 表
+    - Hangfire Server 單 worker、指定佇列 "lcerp"；內建排程 ClearExpiredJWT（每小時，台北時區）
+    - RateLimiting 需在端點以 [AuthFilter(..., rateLimiting: true)] 開啟，目前沒有端點啟用
+    - NLog 只為 4 個具名 logger 設了寫入規則，JSNLog 送回的前端錯誤沒有對應規則
 
+# RD2017004-CSS
 
-# CSS
-
-企業級客戶服務管理系統 (Customer Service System)，提供後台管理 + 前台客戶入口雙介面。
+企業級客戶服務管理系統 (Customer Service System)，提供後台管理 + 前台客戶入口雙介面，
+並以 MCP Server（CssMcp）對外提供 AI 查詢工具。
 
 ## 技術棧
 
-  ┌──────────────┬──────────────────────────────────────────────────┐
-  │ 項目         │ 內容                                             │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 框架         │ ASP.NET Core (.NET 9)                            │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 架構         │ 5 層 MVC（View/Controller/Service/Logic/Domain） │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ ORM          │ Entity Framework Core 9 + SQL Server             │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 前端         │ Kendo UI（MVVM）+ Bootstrap + jQuery + ES6       │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 認證/授權    │ JWT + ASP.NET Core Identity + HMAC（API Client） │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 權限系統     │ 3+1 層（ApiGuid → MenuAttr → AuthFilter          │
-  │              │   + MenuLogics 選單自動生成）                     │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 安全         │ AntiXss Middleware + RateLimiting + CSP Headers  │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 即時通訊     │ SignalR（ChatHub 聊天 + NotifyHub 通知推播）      │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 通知中心     │ NotificationCenter（Pool/Send 模式 + Azure Email）│
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ DI/AOP       │ 自動註冊(AddAutoDi) + EventAOP 自動掃描          │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 排程         │ Hangfire（通知發送 + 合約狀態更新）               │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 快取         │ Redis (StackExchange) / 可退回 MemoryCache       │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 錯誤監控     │ Elmah + Elastic APM（二擇一，互斥）              │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ API 文件     │ Swagger（含自訂快取 + 使用者過濾）               │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 日誌         │ NLog（寫入 DB）+ JSNLog（前端→後端）             │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 多語系       │ translations.csv → T4/PowerShell → .resx +       │
-  │              │   Resources.js（繁中/簡中/英文）                  │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 程式碼生成   │ T4 模板（Enum → Domain.js）+ PowerShell 腳本     │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ Excel 匯出   │ Spire.Office + ExcelBuilders 框架               │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 圖片處理     │ SkiaSharp                                        │
-  ├──────────────┼──────────────────────────────────────────────────┤
-  │ 前端樣式打包 │ Gulp + SCSS（_Design 後台 + _Design_Front 前台） │
-  └──────────────┴──────────────────────────────────────────────────┘
+      ┌──────────────┬──────────────────────────────────────────────────┐
+      │ 項目         │ 內容                                             │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 框架         │ ASP.NET Core (.NET 9)                            │
+      │              │ WebSite + CssMcp 兩個獨立主機                    │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 架構         │ MVC：View → Controller → Service                 │
+      │              │   → Logic（可選）→ DbContext                     │
+      │              │ Service 直接使用 DbContext，無 Repository 層     │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ ORM          │ Entity Framework Core 9 + SQL Server             │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 前端         │ Kendo UI 2024.1（MVVM）+ Bootstrap 5.3           │
+      │              │ + jQuery 3.7 + ES6 Module                        │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 認證/授權    │ Cookie 內裝 JWT + JwtBearer                      │
+      │              │ 帳密登入（自訂密碼雜湊）                         │
+      │              │ + AD 登入（Microsoft Entra ID）                  │
+      │              │ + HMAC（外部系統：智耕雲、LCEPM）                │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 權限系統     │ ApiGuid（API 識別碼）→ Module.cs（權限點）       │
+      │              │   → [AuthFilter]；Menu.cs（MenuAttr）            │
+      │              │   → MenuLogics 依權限自動產生選單                │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ OAuth        │ 自建 OAuth 2.1 授權伺服器（WebSite）             │
+      │              │   PKCE、動態註冊、撤銷；供 CssMcp 驗證           │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 安全         │ AntiXss Middleware（全域）                       │
+      │              │ + HSTS（非 Development 環境）                    │
+      │              │ + 安全標頭（CSP 僅設 frame-ancestors）           │
+      │              │ + 上傳檔依檔頭判斷格式（FileSignatures）         │
+      │              │ 註：RateLimiting 已掛載，目前未生效              │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 即時通訊     │ SignalR（Domain/Hubs）                           │
+      │              │   ChatHub 案件對話 + NotifyHub 鈴鐺通知          │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 通知         │ NotificationCenter：Pool/Send → Email            │
+      │              │   （Azure Communication Services）               │
+      │              │ + Teams 頻道（寄信到頻道信箱）                   │
+      │              │ + SignalR 推播                                   │
+      │              │ + 出站 Webhook（HMAC 簽章，通知智耕雲）          │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ DI/AOP       │ AspectCore + 自動註冊(AddAutoDi)                 │
+      │              │ + EventAOP 自動掃描(AddEventAOPAutoDi)           │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 排程         │ Hangfire（SQL Server 儲存，佇列 ljcss）          │
+      │              │   通知發送 + 合約狀態更新（Dashboard 管理頁）    │
+      │              │   + 背景工作：Teams 通知、Webhook 重試           │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 快取         │ Redis (StackExchange) / 可退回 MemoryCache       │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 錯誤監控     │ Elmah（存 SQL）+ Elastic APM（二擇一，互斥）     │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ API 文件     │ Swagger（依使用者快取 + 依權限過濾文件）         │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 日誌         │ NLog（寫入 DB，4 個目標）+ JSNLog（前端→後端）   │
+      │              │ CssMcp：Serilog → Elasticsearch                  │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 多語系       │ translations.csv → T4/PowerShell → .resx +       │
+      │              │   Resources.js（繁中/簡中/英文）                 │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 程式碼生成   │ T4 模板（Enum → Domain.js）+ PowerShell 腳本     │
+      │              │   LC.Core.tt → LC.Core.js 需在 VS 手動執行       │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ Excel/PDF    │ Spire.Office（Spire.Xls / Spire.Pdf）            │
+      │              │   + ExcelBuilders 框架                           │
+      │              │   Excel 轉 PDF、使用者手冊加浮水印               │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 圖片處理     │ SkiaSharp（縮圖、壓縮）                          │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ AI 應用      │ AiServices：智慧建立合約（ContractPdfParse）     │
+      │              │   Google Gemini REST（gemini-3-flash-preview）   │
+      │              │   解析結果存 AiParseLog，可重用                  │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ MCP Server   │ CssMcp（ModelContextProtocol 1.0）               │
+      │              │   Streamable HTTP（/mcp）+ OAuth token 驗證      │
+      │              │   18 個唯讀 tool：客戶/案件/合約/諮詢/財務/      │
+      │              │   趨勢分析與合約風險                             │
+      ├──────────────┼──────────────────────────────────────────────────┤
+      │ 前端樣式打包 │ Gulp + SCSS（_Design 後台 + _Design_Front 前台） │
+      │              │ 根目錄 gulpfile.js：release 加版本戳             │
+      └──────────────┴──────────────────────────────────────────────────┘
 
-## Solution 分層結構（4 層 + 測試）
+## Solution 分層結構（4 層 + MCP + 測試）
 
-  src/
+      ▎ 說明：src/、Layer1~4、test/ 為 Visual Studio 方案（Solution）的虛擬分層資料夾；磁碟上 32 個專案實際平鋪於 repo 根目錄。
+
+      src/
+      ├── Layer1（共用基礎）
+      │   ├── LC.Core/          — 共用工具、Enums、全域 Filters（ExceptionFilter 等）、AntiXss Middleware、認證（JWT / 外部登入）
+      │   └── Resource/         — .resx 多語系資源檔（T4 產物）
+      │
+      ├── Layer2（資料/領域）
+      │   ├── Domain/           — Entities、Enums、ViewModels、AOP、Hubs（SignalR）、Middlewares
+      │   ├── DbContexts/       — EF Core CSSDbContext（檔名 TemplateDbContext.cs）+ Migrations
+      │   └── Auths/            — 權限定義（ApiGuid、Module、Menu / MenuAttr、OAuth Scope）
+      │
+      ├── Layer3（業務邏輯，可選層）
+      │   ├── MenuLogics/        — 選單邏輯（讀 Menu.cs 自動產生選單）
+      │   ├── ModuleLogics/      — 模組樹解析
+      │   ├── ComboLogics/       — 下拉選單邏輯
+      │   ├── CommonLogics/      — 通用業務邏輯
+      │   ├── CustomerLogics/    — 客戶資料邏輯（含合約階段判定）
+      │   ├── FileLogics/        — 檔案處理邏輯
+      │   ├── KeywordLogics/     — 關鍵字邏輯
+      │   ├── NotificationLogics/— 通知邏輯（含 SignalR 推播）
+      │   └── ExcelBuilders/     — Excel 匯出框架（Spire.Office，[ExcelExportField]）
+      │
+      ├── Layer4（服務層）
+      │   ├── AuthServices/          — 使用者/角色/選單/OAuth/系統介接登入 服務
+      │   ├── SSServices/            — 系統設定/事件日誌服務
+      │   ├── CustomerServices/      — 客戶/合約/輔導/案件服務（含案件 Webhook、合約通知工作）
+      │   ├── ProductServices/       — 產品服務（含使用者手冊浮水印）
+      │   ├── CaseScenarioServices/  — 情境說明服務（含前台 FrontCaseScenario）
+      │   ├── FileServices/          — 檔案服務
+      │   ├── KeywordServices/       — 關鍵字服務
+      │   ├── NotificationServices/  — 通知服務
+      │   ├── QuestionnaireServices/ — 問卷服務
+      │   ├── CommonServices/        — 通用服務
+      │   ├── ExcelBuilderServices/  — Excel 匯出服務（可轉 PDF）
+      │   ├── NotificationCenter/    — 通知發送池（Pool/Send → Email）
+      │   └── AiServices/            — AI 應用服務（智慧建立合約 ContractPdfParse，Google Gemini）
+      │
+      └── WebSite（主 Web 應用）
+          ├── Controllers/        — MVC Controllers（30 個）
+          ├── ApiControllers/     — API Controllers（37 個）
+          ├── Views/              — Razor Views（27 個資料夾 + Shared，含前台 Front、Error、Home、OAuth）
+          ├── Filters/            — 授權（AuthFilter、HmacAuthorize、PermissionAuthorizationHandler）、Hangfire 後台存取限制
+          ├── Jobs/               — Hangfire 工作（通知發送 + 合約狀態更新）
+          ├── Swagger/            — 自訂 Swagger 快取、依權限過濾、Enum 說明
+          ├── Helpers/            — TagHelpers（Bootstrap / Kendo 元件）
+          ├── ViewComponents/     — 版面元件（Banner、BreadCrumbs、Menu、ForestageMenu、PageTitle）
+          ├── _Design/            — 後台切版原始檔（SCSS，Gulp 編譯到 wwwroot）
+          ├── _Design_Front/      — 前台切版原始檔（SCSS，Gulp 編譯到 wwwroot/front）
+          └── wwwroot/            — 靜態資源（JS/CSS/Images）
+
+      CssMcp/                     — MCP Server 獨立主機（掛在方案根層級，不在 src 底下）
+                                    ModelContextProtocol + OAuth token 驗證；18 個唯讀 tool：
+                                    客戶/案件/合約/諮詢/財務/趨勢分析與合約風險
+
+      test/                       （xUnit + Moq + EF InMemory，共 27 個測試案例）
+      ├── ServiceLayer.Tests/     — 共用測試基底（0 個測試案例）
+      ├── AuthServices.Tests/     — 認證服務測試（22 個）
+      └── CustomerLogics.Tests/   — 客戶邏輯測試（5 個，合約階段判定）
+
+## 主要功能模組
+
+      ▎ 依實際選單分組（Auths/Menu.cs）；括號內為 Controller 名稱
+
+      【後台首頁】首頁儀表板(Home)：圖表、案件、逾期、合約分頁
+      【系統管理】客戶資料管理(Customer)、客戶公司管理(CustomerCompany)、員工資料管理(Employee)、
+                  合約專案管理(CustomerProject，含智慧建立合約)、輔導紀錄管理(CustomerConsulting)、
+                  系統分類設定(AppProduct)、系統介接設定(ApiClient)、最新消息管理(Announcement)、
+                  使用者帳號管理(User，含 AD 登入)、角色權限管理(Role)、系統使用紀錄(EventLog)、
+                  系統選單設定(SysOption，選單隱藏)
+      【文件管理】使用者手冊管理(UserGuide)、情境說明類別(CaseScenarioClass)、情境說明管理(CaseScenario)、
+                  意見回饋管理(Feedback)、關鍵字管理(Keyword)、問卷管理(Questionnaire，選單隱藏)
+      【案件管理】案件管理(CustomerIssue)：含案件聊天室、智耕雲 Webhook、版更通知 / 求救
+      【統計報表】客戶案件明細表、客戶顧問輔導時數統計表(Report)
+      【合約追蹤】合約里程追蹤(ContractMilestoneTracking)
+      【前台入口】Front：首頁、使用者手冊下載、情境說明、案件查詢、我要發問、
+                  人員帳號管理、最新消息、通知
+      【對外介接】OAuth 2.1 授權伺服器(OAuth)、系統介接登入(ApiClientAuth，HMAC)、CssMcp（MCP Server）
+
+      ▎ 共用元件（不是選單模組）：自訂列表欄位(CustomGrid)、下拉選單(Combo)、選擇器(Selector)、
+        個人資料管理(MyProfile)、Kendo 圖片瀏覽器、通知鈴鐺(Notification)
+
+## 分層慣例（重要）
+
+    1. View       — Razor Views + Kendo UI MVVM 綁定
+    2. Controller — 路由、參數驗證，呼叫 Service 後包裝回傳
+    3. Service    — 業務邏輯與商業規則，直接注入 CSSDbContext（無 Repository 層）
+    4. Logic      — 可選層：只放跨 Service 重用的規則或查詢
+    5. DbContext  — EF Core 實體與資料庫
+
+      ⚠ Controller 禁止包含業務邏輯，只做：參數驗證 → 調用 Service → 返回結果
+      ▎ 上面 1~5 是由上往下的呼叫順序；Solution 的 Layer1~4 是由下往上編號，兩者不可混用
+      ▎ 規範出處：.claude/docs/conventions/core/architecture.md
+
+## 開發重點注意
+
+    - DI 自動註冊：類別與介面名稱都以 "Logic" / "Service" 結尾即自動掃描注入 (AddAutoDi)，
+        預設 Scoped，可用 [AutoInject] 改生命週期；通知發送池、ComboManage 仍是手動註冊
+    - EventAOP 自動註冊：AddEventAOPAutoDi("Service") 掃描標了 [ServiceName] 的攔截器
+    - 多語系流程：修改 translations.csv → 執行 Exec-TT-Resources.ps1
+        → 生成 .resx + SharedResource.cs + Resources.js（需本機有 Visual Studio 的 TextTransform.exe）
+    - Enum 同步：修改 Domain/Enums → 執行 Exec-TT-Domain.ps1 → 生成 Domain.js；
+        LC.Core/Enums 對應的 LC.Core.js 沒有腳本，需在 VS 手動執行 LC.Core.tt
+    - SCSS 編譯：分別在 _Design、_Design_Front 目錄執行 gulp build-css
+        （後台輸出到 wwwroot，前台輸出到 wwwroot/front）
+    - 前端 JS 版本戳：根目錄 gulpfile.js 的 release，發佈時由 WebSite.csproj 自動執行
+    - 新增權限點：ApiGuid.cs → Module.cs → action 掛 [AuthFilter] → View 按鈕加 HasModule 判斷
+        → 到角色管理頁指派給角色；新增頁面時才需另改 Menu.cs（選單由 MenuLogics 自動產生，不需手改）
+    - 測試：xUnit + Moq + EF InMemory；現行規範未強制 TDD
+    - 開發規範：.claude/docs/conventions/（索引：.claude/rules/conventions-index.md）；
+        .specify/memory/constitution.md 只是 spec-kit 的轉介入口，舊憲法 v1.2.0 已於 2026-04 移除
+    - 功能規格：specs/ 存放 spec-kit 流程產出的需求規格（8 份，最新為 2026-01）
+    - Hangfire 兩支工作掛在 Dashboard 管理頁，程式碼裡沒有設定週期排程
+    - Redis 連線可選（ConnectionStrings:RedisConnection），未設定時退回 MemoryCache；CssMcp 固定用 MemoryCache
+    - Elmah 與 ElasticAPM 互斥，由 ElasticApm:Enabled 控制（此鍵存在且為 false 時才註冊 Elmah）
+
+
+# RD2017004-ERP-Web
+
+企業級 ERP 系統（農業 / 製造業），凌聚科技核心產品。規模極大。
+也是 MESClient 等周邊系統的業務資料來源（對外 API：api/Version1/*）。
+
+## 技術棧
+
+    ┌──────────────┬───────────────────────────────────────────────────┐
+    │ 項目         │ 內容                                              │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 框架         │ ASP.NET MVC 5.2.9 + Web API 5.2.9                 │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 平台         │ .NET Framework 4.7.2（C# 7.x）                    │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ ORM          │ Entity Framework 6.2（Database-First / EDMX）     │
+    │              │   原生 SQL 走 EF SqlQuery；批次用 Z.EF.Plus       │
+    │              │   Dapper 有參考，實際僅 1 處使用                  │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 資料庫       │ SQL Server（817 個實體型別，約 1,400 個檔案）     │
+    │              │ + Azure Key Vault（Always Encrypted）             │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ DI           │ Unity Container 5.11                              │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 前端         │ Kendo UI 2017.3（部分頁面 2023.1）                │
+    │              │ + jQuery 3.6 + Bootstrap 3.4 + Vue 2.4            │
+    │              │ + 自製 Web Components                             │
+    │              │   JS 為全域 script（未模組化），大量用 ES6 語法   │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 認證         │ jose-jwt (JWT) + FormsAuthentication Cookie       │
+    │              │ + Redis 登入對應 + 自製 ErpRoleProvider           │
+    │              │   OWIN 僅用來掛 SignalR / Hangfire Dashboard      │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 排程         │ Hangfire 1.8（24 支固定排程                       │
+    │              │   + 依市場價格設定動態產生）；僅正式環境啟動      │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 快取         │ Redis (StackExchange) + HttpRuntime.Cache         │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 即時通訊     │ SignalR 2.4（強制登出/進度/推播/時間 4 個 Hub）   │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 報表引擎     │ SSRS（.rdl）+ Spire.Pdf / Spire.XLS               │
+    │              │   + QuestPDF + PDFsharp-MigraDoc（多套並存）      │
+    │              │   不再新增 .rdl；客製紙張/標籤預設 Spire.Pdf      │
+    │              │   統計報表走 Spire.XLS 轉 PDF                     │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ Excel        │ Spire.XLS（主力）+ NPOI                           │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 條碼/標籤    │ ZXing.Net + NBarCodes + PDFtoZPL（Zebra 標籤）    │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ OCR          │ Tesseract（訂單自動匯入辨識驗證碼）               │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 瀏覽器自動化 │ Microsoft.Playwright（自動登入通路網站匯入訂單）  │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 影音處理     │ MediaToolkit + FFMpeg（影片縮圖）                 │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 錯誤監控     │ Elmah（寫 SQL）+ Elastic APM（兩者並存）          │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ API 文件     │ Swagger (Swashbuckle)                             │
+    │              │ + API 版本控制（SDammann.WebApi.Versioning）      │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 日誌         │ NLog（寫檔案，保留 7 份）；錯誤進 DB 靠 Elmah     │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 多語系       │ translations.csv → T4/PowerShell → .resx          │
+    │              │   + Resources.js（約 13,700 個 key、3.4MB）       │
+    │              │   繁中/簡中/英文/越南/泰文 共 5 種                │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 推播         │ LINE Messaging + Firebase FCM + Apple APNs        │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 外部整合     │ Azure Email & Blob / ECPay 電子發票 / SMTP        │
+    │              │   / RestSharp（區塊鏈介接）                       │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ AI           │ AI 工具目錄 / AI 排程授權 / AI 助理端點           │
+    │              │   （供外部 AI 平台與 MCP 呼叫，不直接呼叫 LLM）   │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 計算引擎     │ DataTable.Compute（動態公式；NCalc 已停用）       │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 安全         │ 自製 XSSFilter（偵測到危險字串即拒絕）            │
+    │              │ + HtmlAgilityPack（取文字、移除 meta）            │
+    │              │ 註：Confuser 混淆有設定，但發佈流程未啟用         │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 測試         │ ERPTests：xUnit + MSTest + Moq（約 1.1 萬個）     │
+    │              │ E2E：Playwright（外部 repo web-e2e-test）         │
+    │              │   本 repo 的 Selenium E2E 已停用                  │
+    │              │ CI：打包 → 部署 IIS 測試位 → E2E（不跑單元測試）  │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 建構組態     │ Debug / Release / ITRI_Debug / ITRI_Release       │
+    │              │   （程式無 #if ITRI，ITRI 功能靠選單權限區分）    │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 打包         │ Release 發佈：terser（Node）壓縮自寫 JS           │
+    │              │ + BuildBundlerMinifier（僅剩 2 筆設定）           │
+    ├──────────────┼───────────────────────────────────────────────────┤
+    │ 產業         │ 農業 / 製造業                                     │
+    └──────────────┴───────────────────────────────────────────────────┘
+
+## Solution 分層結構
+
+    ▎ 專案採 4 層概念分層（Level1~4，為 Visual Studio 方案資料夾），實際專案資料夾平放在 repo 根目錄。
+      ERP 主專案直接掛在 src 底下，不屬於任何 Level。依賴方向：Core ← DbContexts ← Domain ← 各 Services ← ERP。
+
+    （repo 根目錄，各專案平放）
+    ├── Level1（共用基礎）
+    │   └── Core/              — 共用工具、i18n 資源（Resource / Enum / Menu / Report 四套 .resx，T4 產生）
+    │
+    ├── Level2（資料/領域）
+    │   ├── DbContexts/        — EF6 Database-First（EDMX，817 個實體型別）
+    │   └── Domain/            — Service 介面（81 個）、ViewModels、共用 BLL、權限樹 Auth/AuthCode.cs、BaseService
+    │
+    ├── Level3（客製擴充）
+    │   └── CustomFunctions/   — 依客戶切換的客製實作（Base / GreenLiving / TaiFresh），由 Unity 依設定選用
+    │
+    ├── Level4（服務層，按業務模組拆分，共 11 個）
+    │   ├── FMBServices/       — 廠務基礎資料設定（品項/規格/倉庫/單據/條碼）
+    │   ├── PMServices/        — 進貨管理（詢價/請購/進貨退回）
+    │   ├── SMServices/        — 銷貨管理（自動轉單/銷售彙總/產能查詢）
+    │   ├── QMServices/        — 檢驗管理
+    │   ├── FTBServices/       — 非追不可管理（向食品追溯平台 FTrace 申報）
+    │   ├── FABServices/       — 財會基礎資料設定（會計期間）
+    │   ├── COServices/        — 成本作業
+    │   ├── SECServices/       — 內控預警（檢核點同步）
+    │   ├── PRServices/        — 價格管理（基本價/市場價公式/產品群組）
+    │   ├── LineServices/      — LINE 訊息與 Webhook
+    │   └── AnalysisServices/  — 分析服務（應收/銷售/採購/毛利/MES 良率/需求預測/庫存警示）
+    │
+    ├── ERP/                   — 主 Web 應用（見下方細部）
+    │
+    └── 測試
+        ├── ERPTests/          — 單元測試（xUnit + MSTest + Moq）；本 repo 的 Selenium E2E 已停用
+        └── ERPTestsResources/ — 測試用 LocalDB（ERP.mdf）
+
+    ERP/（主 Web 應用）
+    ├── App_Start/         — 啟動配置（Unity DI / Hangfire / Swagger / 路由 / 權限初始化）
+    ├── Controllers/       — 809 個 .cs（csproj 登錄 784 筆），第一層 53 個目錄（業務模組約 48 個）
+    │   ├── Api/Version1/  — 對外 API，96 個 Controller（B2B / HKB2B2 / MES / Lcepm / LogisticsTMS / Agrigo /
+    │   │                    Analysis / Coaerp / DianDian / Merking / RichHouse / Generic …）
+    │   ├── _SM/           — 銷貨管理
+    │   ├── _PM/           — 進貨管理
+    │   ├── _WM/           — 庫存管理
+    │   ├── _PO/           — 加工管理
+    │   ├── _FAB/_FAS/_FR/ — 財會基礎設定/固定資產/帳冊報表
+    │   ├── _CO/           — 成本作業
+    │   ├── _EI/           — 電子發票
+    │   ├── _BI/           — 基本資料
+    │   ├── _BS/           — 系統管理
+    │   ├── _Common/       — 共用（AI 助理/歷程/系統參數/檔案/通知）
+    │   └── ...（其餘模組見下方清單）
+    ├── BLL/               — 業務邏輯層（201 個 .cs，24 個子目錄）
+    │   ├── SM/ SMOrderImport/ — 銷貨業務、通路訂單匯入
+    │   ├── FA/            — 財會業務（過帳/沖銷）
+    │   ├── PM/ PO/ WM/ QM/ — 進貨/加工/庫存/檢驗業務
+    │   ├── Exports/       — 資料匯出
+    │   ├── ExternalSystem/ — 外部系統串接（LCEPM / TPI）
+    │   ├── GenericApi/    — 通用 API 介面
+    │   └── Report/ ReportSend/ — 報表/報表派送
+    ├── Services/          — ERP 專案內的 Service（如系統參數）
+    ├── Models/            — 快取/資料/回應包裝模型
+    ├── ViewModels/        — ViewModels（556 個 .cs，48 個模組子目錄）
+    ├── Views/             — Razor Views（510 個目錄，1,479 個 .cshtml）
+    ├── Scripts/           — 前端 JavaScript（含 Plugin/kendo、WebComponent）
+    ├── Report/            — SSRS 報表（ReportBuilder / ReportFilter / ReportModel / ReportTool 等 10 個子目錄）
+    ├── QuestPdf/          — QuestPDF 報表/標籤引擎
+    ├── SpirePdf/ Pdf/     — Spire.Pdf 與 PDF 工具
+    ├── Excel/             — Excel 匯出工具
+    ├── SignalR/           — 即時通訊 Hub + OWIN Startup
+    ├── Filters/           — 動作過濾器（含 XSSFilter、SSO 驗證）
+    ├── Interceptors/      — EF 指令攔截器
+    ├── Timers/            — 定時器
+    ├── Caches/            — 快取
+    └── App_Data/          — DB Script、Excel 範本、匯入範例、檢核點
+
+## 主要業務模組（約 48 個業務模組目錄，摘要）
+
+    ▎ 名稱以 Domain/Auth/AuthCode.cs 權限樹為準；分組依業務領域整理，不是選單結構
+
+    【銷貨】SM 銷貨管理、SO 門市管理、OS 網購管理、CP 校園平台管理
+    【進貨】PM 進貨管理
+    【價格】PR 價格管理
+    【生產】PO 加工管理、MES 製程管理、MRP 物料需求管理、TR 試產管理
+    【農業】SD 種苗管理、HM 採收管理、GF 農家直採、AM 拍賣場管理
+    【庫存】WM 庫存管理、PTM 追溯管理、TM 理貨管理
+    【財務】FAB 財會基礎設定、GL 總帳管理、FAS 固定資產、FR 帳冊報表、DE 折扣費用管理
+    【資金】BA 資金管理、AP 付款管理、AR 收款管理、BM 票據管理、CM 零用金管理
+    【稅務】TAX 營業稅管理、EI 電子發票
+    【成本】CO 成本作業、PC 進貨成本管理
+    【品管】QM 檢驗管理
+    【食安】FTB 非追不可管理、FDM 食品管理（產品標籤）
+    【基本】BI 基本資料、FMB 廠務基礎資料設定、DI 介接設定
+    【電商】AGO 農易訂（Agrigo，選單名「APP上架管理」）
+    【物流】LM 物流管理
+    【設備】EMR 設備保修管理
+    【團膳】GM 團膳管理（菜單/營養/食譜/供餐單位）
+    【智能秘書】SEC 內控預警、AI 助理（位於 _Common）
+    【報表】SR 統計報表（含報表派送設定）
+    【客製】ITRI 工研院客製（首頁/物流商/事件管理）
+    【系統】BS 系統管理、PS 個人設定與通知中心、Web 系統入口
+    【已停用】APP 行動化管理（2026-10 撤除，只剩下拉選單）、OLAP（僅 Demo，選單無入口）
+
+## 外部系統整合
+
+    - Agrigo 農易訂平台（LJ.AgrigoExchangeLibrary，含 SignalR client）
+    - LCEPM 農業生產管理系統（收成/種植/包裝/出貨/種子銷售）
+    - MES 製造執行系統（製程紀錄/看板/任務/製程合併）
+    - B2B 企業間交易（HKB2B 香港 B2B，每 2 分鐘同步 + 通用 B2B）
+    - 物流 TMS（棧板/拋轉/訂單/基礎資料）、黑貓宅急便 API
+    - ECPay 綠界電子發票（開立/折讓/管理）；Odee AI 訂閱帳單開票
+    - 通路訂單匯入（全聯/美廉社/Costco/遠百/家樂福/頂好/三商餐飲/大潤發/7-11/小北/康達盛通…）
+        部分通路以 Playwright 自動登入 + Tesseract 辨識驗證碼
+    - 食藥署 非追不可（FTrace）食品追溯申報
+    - 北農行情爬蟲 + 農業部開放資料
+    - 會計 / 金流：COAERP 會計介接、點點金流收款回呼
+    - 其他客戶介接：默金(Merking)、壽米屋(RichHouse)、SSO
+    - AI 平台：AI 工具目錄 / AI 排程授權 / AI 助理（供外部 AI 與 MCP 呼叫）
+    - 推播：LINE Messaging、Firebase FCM（Android）、Apple APNs（iOS）
+    - Azure（Email / Blob Storage / Key Vault）、SMTP 寄信
+    - 區塊鏈（智耕雲介接，呼叫 Azure Functions）
+
+## 開發重點注意
+
+    ⚠ 新建任何檔案後，必須立即加入對應的 .csproj（舊式專案格式，不自動包含）
+    - Controller 檔 → ERP.csproj (<Compile>)
+    - View (.cshtml) → ERP.csproj (<Content>)
+    - Script (.js) → ERP.csproj (<Content>)
+    - Entity → DbContexts.csproj (<Compile>)
+    （完整對照表見 CLAUDE.md；中央 plugin 的 hook 只在 Write / Edit 時提醒，用指令列建的檔不會觸發）
+
+    ⚠ 新建 .cshtml / .cs 後必須補 UTF-8 BOM：py {TOOLKIT.tools_root}/add-bom.py <filePath>
+      （腳本在中央 toolkit plugin；hook 只偵測提醒、不會自動補；.sql 規定不帶 BOM）
+
+    - 開發前查閱 .claude/rules/conventions-index.md 找到對應規範
+    - 規範文件：.claude/docs/conventions/（約 117 篇，分 core / development / document / report）
+    - 知識文件：.claude/docs/knowledge/（約 61 篇，涵蓋銷售鏈/採購/生產/倉庫/追溯/理貨等）
+    - 流程文件：.claude/docs/flows/（10 篇，領域端到端 SOP）
+      （以上三類於 2026-08 從 .specify/memory/ 搬移；.specify/memory/ 現在只剩 constitution.md）
+    - 開發經驗庫：.experience/（開發前以關鍵字 grep README 索引；目前未納入版控，各機器內容可能不同）
+    - 模組對照：.mapping/controller_module_mapping.csv（423 筆，輔助用；模組名稱以 AuthCode.cs 為準）
+    - MCP 工具鏈：改由 linkjoin 中央 plugin 提供（toolkit：db / excel / playwright；tfs plugin：tfs；
+      devin 由 SessionStart hook 註冊）；專案參數集中在 toolkit.json
+    - CI Pipeline：erp-ci-with-e2e-tests.yml（取測試空位 → Release 打包並壓縮 JS → 部署 IIS
+      → 外部 repo Playwright E2E；不跑 ERPTests 單元測試）
+    - 本機部署：Deploy-IISERP.ps1（把 Release 預編譯版部署到本機 IIS 站台 IISERP）
+    - 多語系：修改 translations.csv → 透過 /build-resources 執行 Exec-TT-Resources.ps1
+      （產出 Resource / EnumResource / MenuResource / ReportResource 的 .cs + .resx，以及前端 Resources.js）
+    - 分層慣例：Controller → Service → BLL → Repository（UnitOfWork）→ DB
+      （Controller 不含業務邏輯；BLL 不可直接回傳給 Controller；出處 .claude/docs/conventions/core/architecture.md）
+      註：大量舊 Controller 仍直接 new BLL 並持有 IRepository；新功能依規範走 Service
+    - ITRI 建構組態：工研院客製版本有 ITRI_Debug / ITRI_Release，但程式碼沒有 #if ITRI，
+      ITRI 功能實際靠選單與權限區分
+    - specs/：spec-kit 需求設計文件（42 份），非 spec-kit 流程禁止掃描
+
+
+# RD2023001 (HKLogistics)
+
+> 查核日期：2026-10-29｜分支：master｜commit：62b28de3（2026-10-28）
+
+物流配送管理系統 (Logistics Distribution Management System)，專注冷鏈/農產品配送，
+涵蓋派車排線、司機任務、代運/託運管理、箱籃資材庫存、運費結算。
+提供 Web 後台 + 行動端 API（司機 App / 管理者 App / 代運客戶）+ 外部介接 API（ERP、金寶）。
+
+## 技術棧
+
+  ┌──────────────┬──────────────────────────────────────────────────────┐
+  │ 項目         │ 內容                                                 │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 框架         │ ASP.NET MVC 5.2.9 + Web API 5.2.9                    │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 平台         │ .NET Framework 4.7.2（C# 7.x）                       │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ ORM          │ Entity Framework 6.5（Database-First：DB.edmx + T4） │
+  │              │   批次：EntityFramework.Utilities（新增）            │
+  │              │   + Z.EntityFramework.Plus（更新/刪除）              │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 資料庫       │ SQL Server（153 個 Entity，由 DB.tt 產生）           │
+  │              │   Release 起站時自動執行 App_Data/DBScripts          │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 資料存取     │ Repository + UnitOfWork（EFGenericRepository         │
+  │              │   / EFUnitOfWork）為全站主力；多數 Controller        │
+  │              │   自行 new EFUnitOfWork                              │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ DI           │ Unity Container 5.11（只註冊 IUnitOfWork）           │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 快取         │ Redis (StackExchange) / 未設定時改用記憶體           │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 前端         │ Kendo UI 2017.3（單頁用 2023.1）+ jQuery 3.6         │
+  │              │ + Bootstrap 4.6 + Vue 2.4 + Google Maps JS           │
+  │              │ + SweetAlert2 / select2 / Chart.js 等                │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 認證         │ Web：Session + 快取 + 自訂 RoleProvider              │
+  │              │   + 登入驗證碼 + ERP SSO 登入（失敗節流）            │
+  │              │ App API：JWT (jose-jwt, HS256)                       │
+  │              │ AntiForgery：自訂 Cookie，僅少數 action 驗證         │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 介接認證     │ InterfaceApiAuthFilter（ERP，JWT + 公司 token）      │
+  │              │ + JBDeliveryOrderApiAuthFilter（金寶訂單）           │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 排程         │ Hangfire 1.7（1 支：每 2 分鐘 EUP GPS 匯入           │
+  │              │   + 車溫檢查；需 Eup.IsEnable=true）                 │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ OWIN         │ Startup 掛 Hangfire Dashboard + MapSignalR           │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 錯誤監控     │ Elastic APM 1.21 + ELMAH 1.2（寫 SQL）               │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ API 文件     │ Swagger（Swashbuckle 5.6，依權限過濾文件）           │
+  │              │ + API 版本控制（SDammann + api/Version1）            │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 日誌         │ NLog（寫本機檔案 App_Data/Logs）                     │
+  │              │ + HSTS + 移除版本標頭                                │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ GPS 整合     │ EUP 衛星犬車機 API（定時匯入 + 車溫警報推播）        │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 路線優化     │ Google Routes API computeRoutes（預設，單車）        │
+  │              │ + Route Optimization API optimizeTours               │
+  │              │   （多車或停點 > 25 時）                             │
+  │              │   由 RouteOptimizationProviderSelector 切換          │
+  │              │   認證：服務帳號 OAuth；呼叫記錄存 LC_GoogleApiLog   │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 地圖/地理    │ Google Maps JS（路線地圖）+ Geocoding API            │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ ERP 整合     │ 雙向：本系統呼叫 ERP TMS API（基本資料/訂單/         │
+  │              │   傳票拋轉/棧板/SSO）；ERP 呼叫 DocumentSync         │
+  │              │   （基本資料/貨號對應/進貨重量/封箱/整板）           │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 其他介接     │ 金寶蛋品配送訂單（SyncJBOrder）、SMTP 寄信           │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 其他套件     │ SharpZipLib（zip 下載）                              │
+  │              │ + HtmlAgilityPack（解析 html 格式的 xls）            │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ 測試         │ MSTest + Moq + Fake UnitOfWork/Repository            │
+  │              │   約 6,200 個測試方法；dotnet-coverage 覆蓋率閘門    │
+  ├──────────────┼──────────────────────────────────────────────────────┤
+  │ CI           │ GitHub Actions（6 個 job，僅在 GitHub 鏡像執行）     │
+  │              │ + ADO YAML（4 個 job；依檔頭註解尚未掛分支原則）     │
+  │              │ 既有 PR 擋關：PJ2019071-CI（定義不在 repo）          │
+  └──────────────┴──────────────────────────────────────────────────────┘
+
+## 有參考但未使用 / 有程式但未啟用
+
+    有參考但未使用：SignalR（僅 MapSignalR，無 Hub）、WebMatrix、Microsoft.Owin.Security、NBarCodes、
+    RestSharp、BouncyCastle、Google.Apis.Sheets、ReportViewer / RDLC、SSR
+    System.Web.Optimization、Sentry、Application Insights、AI.Route.* 設定鍵
+
+    有程式但 repo 設定未啟用：Azure Key Vault 加密欄位（SQL Always Encryp
+    EUP GPS 排程（Eup.IsEnable=false）、車溫異常推播（通知帳號未設定）
+
+## Solution 結構
+
+  HKLogistics.sln（2 個專案：HKLogistics、HKLogistics.Test）
+  ├── HKLogistics/          — 主 Web 應用（單一專案，內含所有層級）
+  │   ├── App_Start/        — 啟動配置（Unity / Hangfire / Swagger / Auth / WebAPI / 路由，12 支）
+  │   ├── App_Data/         — 權限定義（AuthCode.cs / AuthPage.cs / SystemModule.cs）+ DBScripts
+  │   ├── Controllers/      — 137 支 .cs（133 支 Controller + 4 支基底），第一層 13 個目錄
+  │   │   ├── Api/Version1/ — 34 支：Driver / Manager / Consignment（行動端）、DocumentSync（外部介接）、共用
+  │   │   ├── _VD/          — 派車管理
+  │   │   ├── _VM/          — 車輛管理
+  │   │   ├── _BI/          — 基本資料
+  │   │   ├── _FD/          — 代運管理
+  │   │   ├── _BM/          — 箱籃管理
+  │   │   ├── _SR/          — 統計報表（派車 / 代運 / 箱籃）
+  │   │   ├── _BS/          — 系統管理
+  │   │   ├── _PS/          — 個人設定
+  │   │   ├── _Common/      — 共用（GPS 匯入 / 歷程 / 多語 / 系統參數 / 檔案）
+  │   │   ├── _Web/         — 首頁 / Dashboard / 通知 / 驗證碼
+  │   │   ├── SD/           — 託運管理
+  │   │   └── LightBox/     — 彈窗元件
+  │   ├── BLL/              — 業務邏輯（35 支 .cs：29 支 BLL/Service + 6
+  │   │   ├── AssignCarRoute*  — 智慧派車核心（Command / 查詢 / LegacySync 回寫舊派車表）
+  │   │   ├── GoogleRouteOptimizationService   — optimizeTours（支援多車）
+  │   │   ├── GoogleRoutesComputeRoutesService — computeRoutes（單車，預
+  │   │   ├── RouteOptimizationProviderSelector — 兩供應商執行期切換
+  │   │   ├── GoogleApiLogBll  — Google API 呼叫記錄
+  │   │   ├── OrderBLL / MessageBLL — 訂單 / 訊息通知
+  │   │   ├── CallErpApiBll / CallErpOrderApiBll / ErpSsoLoginBll — ERP API 呼叫與 SSO
+  │   │   ├── IPushNotificationSender — FCM / APNs 推播
+  │   │   ├── PullPalletBll / SortingBoxPalletBll — 拉板 / 封箱整板
+  │   │   └── DriverCostSettleBll / DriverWeightSettleBll — 司機費用 / 總
+  │   ├── Models/            — EF6 Entity（T4 產生）+ 共用模型
+  │   │   ├── DB.tt / DB.Context.tt / DB.edmx — T4 → Entity
+  │   │   ├── _Api / _Auth / _Data / _Responses — API 回應、權限、Enum/Gr
+  │   │   ├── _Entity/       — 手動擴展的 Entity partial class
+  │   │   ├── _Interfaces/   — IRepository / IUnitOfWork / 實體標記介面
+  │   │   └── _Repositories/ — EFGenericRepository / EFUnitOfWork / DbContextFactory
+  │   ├── ViewModels/        — 131 支，15 個模組子目錄
+  │   ├── Inventory/         — 庫存異動引擎（10 種單據 + StNumDocBase + 分派器 StNumDocProcess）
+  │   ├── EupAPI/            — 衛星犬 GPS 車機 API
+  │   ├── SignalR/           — OWIN Startup（掛 Hangfire Dashboard；無 Hub）
+  │   ├── Report/            — Excel 報表（ExcelBuilder + ExcelTools）
+  │   ├── Filters/           — 認證 / API 認證 / 介接認證 / 例外處理 / 計時（全域）/ 參數 /
+  │   │                        頁面跳轉 / 結算鎖 / Dashboard 存取
+  │   ├── Tools/             — 登入、設定、Redis、檔案等工具
+  │   ├── Views/             — Razor Views（63 個功能目錄 + Shared）
+  │   ├── Scripts/           — 前端 JavaScript（含 Plugin 第三方套件）
+  │   ├── Content/           — SCSS 原始檔 + gulp
+  │   ├── _Core/             — 共用工具（Extensions / Loggers / Paging / Security）
+  │   ├── Resources/         — 多語系（.resx + T4）
+  │   ├── Templates/         — 郵件範本
+  │   └── 其他               — Attributes / Extensions / Helpers / Interceptors（EF 指令）/ Keys / wwwroot
+  │
+  ├── HKLogistics.ERP/       — 不在 sln、git 不追蹤，只剩本機 bin/obj（已棄置）
+  │
+  └── HKLogistics.Test/      — 測試專案（MSTest + Moq，262 支 .cs）
+      ├── Fakes/             — FakeUnitOfWork / FakeRepository / UnitTestBase 等
+      ├── Builders/          — Test Data Builders
+      ├── BLL/               — BLL 測試 31 支
+      ├── Controllers/       — Controller 測試 158 支（根目錄 / Api / _VD / _BI / _SR / _FD / LightBox）
+      ├── Tools/ Helpers/ Filters/ Report/ Extentions/ Inventory/ Models/ — 其他單元測試
+      └── App_Data/          — 整合測試用 LocalDB
+
+  其他：build/（測試與覆蓋率腳本，Verify-All.ps1 為單一驗證入口）、dev-start.ps1（本機一鍵起站）、
+        .pipelines/ 與 .github/workflows/（CI）、.claude/（AI 開發工具與規範文件）
+
+## 分層慣例（規範 vs 實況）
+
+    規範（.claude/docs/共用基礎建設與開發慣例.md）
+    - 列表頁 Controller 繼承 BaseManageController，標準寫法由 Controller 私有的 Search() 直接查詢並分頁
+    - 資料存取透過注入的 IUnitOfWork<DBEntities> 取得 Repository；資料異
+    - 交易邊界只開一層：呼叫端已開交易時 BLL 不可再開；兩種情境都會呼叫的
+      選項（範式：DriverWeightSettleBll 的 useTransaction）
+    - 沒有明文規定 Controller 與 BLL 的分工
+
+    實況（抽樣 3 條呼叫鏈）
+    - 智慧派車：VDAssignCarRouteController.DeleteRoutes（:1459）→ AssignCarRouteCommandBll.DeleteRoutes
+      （:1017）→ BLL 自開 CommitInTransaction + Repository.DeleteRange
+    - 列表頁：BIUnitController.Index(POST)（:63）→ this.Search()（:94）→ Repository.FindBy（:96），
+      不經 BLL；寫入也由 Controller 自開交易
+    - 拉板：VDPullPalletController.GetTrips（:202）→ PullPalletBll.GetTrips（:61）→ FindByAsNoTracking
+
+    不一致處
+    - 規範寫「透過注入取得 uow」，實況 127 支 Controller 自行 new EFUnitOfWork，只有 8 支 public 建構子接收注入
+    - 13 支 BLL 會自行開交易（規範允許），被已開交易的 Controller 呼叫時會發生巢狀交易錯誤
+
+## 主要業務模組（名稱以 HKLogistics/App_Data/AuthCode.cs 為準）
+
+  【派車管理】VD - 配送訂單、派車作業、智慧派車作業（多車規劃 + Google 路順優化，
+              新資料回寫舊派車表）、任務加派單、任務訊息單、派車檢視、
+              司機任務檢視、司機總重結算、司機費用結算（含每日費用調整）、
+              整板檢視、拉板作業
+  【車輛管理】VM - 車輛異常單、出車檢查單、車輛油費紀錄、司機排班管理、
+              司機休假管理、司機排班表、車輛保養表
+  【代運管理】FD - 代運客戶管理、代運計價設定、代運訂單（含代收貨類型）、代運收入結算
+  【箱籃管理】BM - 箱籃出貨回收單、箱籃調整單、箱籃庫存查詢、箱籃資材結算
+  【託運管理】SD - 託運廠商管理、託運計價設定、託運費用結算
+  【基本資料】BI - 配送單位管理、箱籃資材管理、配送車輛管理、司機資料管理、
+              配送點區域管理、配送點管理、店別資料管理、配送點/店別管理、
+              配送路線管理、運費類別管理、司機運費設定、
+              ERP客戶單位對應、ERP廠商單位對應
+  【統計報表】SR - 派車報表 001~013（每日配送點車輛調度表、每日車輛調度表、
+              每趟派車單、每月司機費用統計表、路線訂單明細表等）、
+              代運報表 001~004、箱籃報表 001~002
+  【系統管理】BS - 公司資料管理（僅系統管理者）、系統參數設定、系統選單設
+              角色權限管理、人員帳號管理、系統使用記錄
+  【外部介接】DocumentSync - ERP 基本資料 / 客戶與廠商貨號 / 進貨重量 / 封箱 / 整板；
+              金寶蛋品配送訂單（SyncJBOrder）
+
+  ▎ 各公司可用的模組由「公司資料管理」的設定（BS_CompanyFunction）決定，不是寫死在程式裡。
+
+## 行動端與介接 API（Api/Version1/，34 支）
+
+  【司機端】Driver（10）- 司機任務、司機箱籃資材、出車檢查單、拉板/拉貨、下貨、整板、
+                         車輛油費紀錄、車輛異常單、司機休假申請、司機通知
+  【管理者】Manager（9）- 配送訂單、加派任務、任務訊息、管理者任務、代運訂單、
+                         代收貨訂單（含列印箱籃/棧板標籤）、箱籃、通知、
+  【代運端】Consignment（3）- 代運訂單 / 代運任務 / 代運箱籃
+  【共用】（6）AuthApi / Files / EUP(GPS) / Personal（含推播 Token）/ Notice / DropDownMenu
+  【外部介接】DocumentSync（6）- 以 InterfaceApiAuthFilter（ERP）/ JBDeliveryOrderApiAuthFilter（金寶）驗證
+
+## 庫存異動引擎（Inventory）
+
+    10 種單據類別（internal sealed）繼承 StNumDocBase（實作 IStockNum）；
+    由靜態分派器 StNumDocProcess 在全域 lock 下，依 StockModuleType 建立對應單據並處理庫存增減：
+    - 調整單：入庫、出庫、代運取貨入庫
+    - 司機：任務箱籃登記、資材出貨、回收直送代運客戶
+    - Web 箱籃出貨回收單：出貨、驗收
+    - APP 管理者驗收、代運客戶驗收
+    呼叫端為 5 支 Controller（司機 / 管理者 / 代運 的箱籃 API、BMBoxAdjustment、BMBoxShipReturn）
+
+## 路線優化（釐清）
+
+    - 幾何路線優化呼叫外部 Google API，非本機計算。RouteOptimizationProvi
+      預設 Routes API computeRoutes（單車、較省成本）；需多車、或單車停點數 > 25 時改用
+      Route Optimization API optimizeTours。設定鍵 GoogleRouteOptimization.Provider
+      （WebAppSettings.config，預設 RoutesComputeRoutes）。
+    - 路線優化按鈕依公司參數 LC_Company.IsConnectionGoogleMaps 開放。
+    - 原 AI 路線規劃對話（AiRouteChatService / RouteMcpService / McpRoute API）已於 2026-07-10 移除，
+      只剩未使用的 AI.Route.* 設定鍵。
+
+## 開發重點注意
+
+      ⚠ 新建任何檔案後，必須立即加入 HKLogistics.csproj（舊式專案格式，沒有萬用字元）
+        （中央 toolkit plugin 的 hook 只會提醒；2026-10 刪掉的 4 支 Controller 就是沒進 csproj 的死碼）
+    - Entity 由 T4（DB.tt + DB.Context.tt + DB.edmx）產生，手動擴展寫在 Models/_Entity partial class
+    - 資料存取以 Repository + UnitOfWork 為全站標準；交易邊界只開一層（見「分層慣例」）
+    - 交易內不做外部呼叫（推播、ERP API、寄信），收集後於 CommitInTransac
+    - 庫存異動統一走 Inventory 引擎；目前 Inventory 以外只有 BMBoxStockController 唯讀查詢 ST_Stock
+      （此規則沒有明文規範，屬程式慣例）
+    - 行動端 API 繼承 BaseApiController（檔名 _BaseApiController.cs）；MV
+      BaseManageController（或 BaseController），例外：Error / Captcha / Locationization
+    - GPS：Hangfire 每 2 分鐘匯入 EUP 衛星犬資料並檢查車溫，需 Eup.IsEnable=true（repo 內預設 false）
+    - ERP 雙向同步：本系統 → ERP 走 CallErpApiBll / CallErpOrderApiBll（TMSBaseData / TMSOrderData /
+      TMSThrowTrans / TMSPallet / SsoInterface）；ERP → 本系統走 DocumentSync API
+    - 智慧派車新路線資料由 AssignCarRouteLegacySyncBll 以自然鍵 upsert 回寫 5 張舊派車表
+      （相容舊頁面 / App / 報表；同公司同交貨日以 semaphore 互斥，只在單一行程內有效）
+    - DB 結構升級：Release 起站時自動執行 App_Data/DBScripts
+    - 多語系：修改 SharePoint 上的語系 Excel → 執行 Resource.tt（透過 Microsoft Graph 讀取）→ .resx / Resources.js
+    - 測試與 CI：build/Verify-All.ps1 為單一驗證入口；分 UnitFast / Integ
+      覆蓋率閘門 BLL 整體 ≥ 88%、Controller 整體 ≥ 92%
+    - 開發規範：.claude/docs/（共用基礎建設與開發慣例、公司別隔離、前端開
+      由 .claude/rules/conventions-index.md 路由；.github/copilot-instructions.md 內容較舊
+    - 本機起站：dev-start.ps1（gulp watch + IIS Express；加 -Build 先建置）
+    - 核心檔案極大：AssignCarRouteCommandBll 約 326KB、AssignCarRouteBll 約 257KB、
+      VDDeliveryOrderController 約 320KB、VDAssignCarV2Controller 約 208KB
+
+
+# RD2017004-LXKiosk
+
+> 查核日期：2026-10-29｜分支：main｜commit：1814e03（2026-08-05；程式碼最後改動 0b406e1，2025-10-22）
+
+農產品分級秤重 Kiosk 系統（系統名稱：聯興智慧磅秤進貨系統），專為現場操作員設計的觸控式終端應用。
+透過 API 串接 ERP 系統，並經本機小工具（KioskTool）連接磅秤與標籤印表機，
+實現農產品暫收 → 分級 → 秤重 → 列印 → 送出 / 進貨退出 的完整作業流程。
+
+## 技術棧
+
+  ┌──────────────┬────────────────────────────────────────────────────┐
+  │ 項目         │ 內容                                               │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 框架         │ ASP.NET Core MVC + Web API（混合）                 │
+  │              │   JSON 序列化：Newtonsoft.Json                     │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 平台         │ .NET 7（19 個專案皆為 net7.0）                     │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ ORM          │ Entity Framework Core 7.0.5 + SQL Server           │
+  │              │   + EF 稽核軌跡 + 全域軟刪除                       │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ DI/AOP       │ 自動註冊(AddAutoDi) + AspectCore（EventAOP，       │
+  │              │   只攔截 UserAuthService）                         │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 前端         │ Kendo UI 2021.3（MVVM）+ jQuery 3.7 + ES6 Module   │
+  │              │ + Bootstrap（CSS 4.6 / JS 5.1 混用）               │
+  │              │   觸控式 UI，含自製數字鍵盤                        │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 本機小工具   │ KioskTool：本機常駐程式（SignalR Hub），           │
+  │              │   網頁以 SignalR client 連線：取得 Kiosk 識別、    │
+  │              │   接收磅秤重量、送 PDF 列印                        │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 認證         │ ERP QR 登入（掃碼槍）→ 本系統簽發 JWT（HS256）     │
+  │              │   API 用 Bearer、頁面用 Cookie（內含 JWT）         │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 權限         │ AuthFilter + PermissionAuthorizationHandler        │
+  │              │   （ApiGuid / Module / Menu）                      │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 安全         │ AntiXss Middleware（全域）+ HSTS（非 Dev）         │
+  │              │ + CSP（僅 frame-ancestors）+ X-Frame-Options       │
+  │              │ + X-XSS-Protection + X-Content-Type-Options        │
+  │              │ 註：RateLimiting 已掛載，目前無端點啟用            │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 排程         │ Hangfire 1.8（1 支：ClearExpiredJWT 每小時，       │
+  │              │   UTC；單 worker、佇列 lcerp）                     │
+  │              │ + Dashboard.Management（後台可手動觸發 job）       │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 快取         │ Redis (StackExchange) / 未設定時改用 MemoryCache   │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 錯誤監控     │ Elastic APM（程式一律掛載；僅 QA / Staging 有      │
+  │              │   設定區段，Production 走套件預設）；無 Elmah      │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ API 文件     │ Swagger（Swashbuckle 6.2，不分環境開放）           │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 日誌         │ NLog（寫入 DB：SystemTrackTransaction /            │
+  │              │   SystemEventLog）+ JSNLog（前端錯誤送後端，       │
+  │              │   但 NLog 沒有對應規則，不會寫入 DB）              │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 多語系       │ T4：SharePoint 上的 Excel（Microsoft Graph）       │
+  │              │   → .resx（3 語系）+ SharedResource.cs             │
+  │              │   → Resources.js                                   │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 程式碼生成   │ T4 模板（Enum → Domain.js / LC.Core.js /           │
+  │              │   LCERPApiLogics.js），需在 VS 執行                │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 列印         │ Spire.Pdf 產生標籤 PDF（ZXing + SkiaSharp QR 碼）  │
+  │              │   → 交給 KioskTool 列印                            │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 前端樣式     │ _Design（SCSS + Gulp → wwwroot）                   │
+  │              │   無 gulp 版本戳；Layout 資源用 asp-append-version │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 中介軟體     │ KioskHeaderMiddleware（讀 Kiosk-Guid header）      │
+  │              │   + CultureMiddleware + RateLimitingMiddleware     │
+  │              │   （三者皆在 Domain 專案）                         │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ ERP 整合     │ 14 支 ERP API：PMGradedPurchase 11 支              │
+  │              │   + AuthApi 2 支 + FMBDrop 1 支                    │
+  │              │   HTTP 由 LCApiLogics（IHttpClientFactory）發送    │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 環境         │ appsettings：base / Production / QA / Staging      │
+  │              │   （+ 選用的 connectionstrings.json）              │
+  ├──────────────┼────────────────────────────────────────────────────┤
+  │ 測試         │ xUnit + Moq + EF InMemory（目前僅 1 個測試）       │
+  └──────────────┴────────────────────────────────────────────────────┘
+
+## 有參考但未使用
+
+    RateLimitingMiddleware（已註冊，0 個端點啟用）、CommonLogics 專案（沒有任何專案參考）、
+    UserModifyServiceAOP / UserDeleteServiceAOP（未註冊）、Macross.Json.Extensions、Razor RuntimeCompilation、
+    Hangfire.Console（已掛載，但 job 沒有輸出）、wwwroot/js 底下舊版 kendo / bootstrap 檔（Layout 未載入）、
+    web.config 的 httpCookies（ASP.NET Core 不讀）、Migration.sql（空檔）
+    另：DataProtection 的 DB key store 已設定，但 auth cookie 的加密器在它之前就建立，推測沒有用到 DB 裡的 key（未實測）
+
+## Solution 分層結構（4 Layer + 測試）
+
+  ※ 以下為 Visual Studio「方案資料夾」的邏輯分層；實體專案（19 個）平鋪於 repo 根目錄。
+
+  src/（方案資料夾）
   ├── Layer1（共用基礎）
-  │   ├── LC.Core/          — 共用工具、Enums、Filters、Middlewares、認證
-  │   └── Resource/         — .resx 多語系資源檔
+  │   ├── LC.Core/           — 共用工具、全域 Filters（ExceptionFilter）、Authentication（JWT）、AntiXss Middleware
+  │   └── Resource/          — .resx 多語系資源檔（zh-Hant / zh-Hans / en-US，T4 產生）
   │
   ├── Layer2（資料/領域）
-  │   ├── Domain/           — Entities、Enums、ViewModels、AOP、Hubs(SignalR)
-  │   ├── DbContexts/       — EF Core CSSDbContext + Migrations
-  │   └── Auths/            — 模組權限定義（ApiGuid、MenuAttr）
+  │   ├── Domain/            — Entities、Enums、AOP、Middlewares（KioskHeader / Culture / RateLimiting）、ViewModels
+  │   ├── DbContexts/        — EF Core LXKioskDbContext（檔名 TemplateDbContext.cs）+ 8 個 Migrations
+  │   ├── Auths/             — 權限定義（ApiGuid / Module / Menu）與登入者資訊
+  │   └── LCApiLogics/       — 通用 HTTP 包裝（IHttpClientFactory，全站唯一發出 HTTP 的地方）
   │
   ├── Layer3（業務邏輯）
   │   ├── MenuLogics/        — 選單邏輯
   │   ├── ModuleLogics/      — 模組樹解析
-  │   ├── ComboLogics/       — 下拉選單邏輯
-  │   ├── CommonLogics/      — 通用業務邏輯
-  │   ├── CustomerLogics/    — 客戶資料邏輯
-  │   ├── FileLogics/        — 檔案處理邏輯
-  │   ├── KeywordLogics/     — 關鍵字邏輯
-  │   ├── NotificationLogics/— 通知邏輯
-  │   └── ExcelBuilders/     — Excel 匯出框架（Spire.Office）
+  │   ├── ComboLogics/       — 下拉選單基底類別（BaseComboService）
+  │   ├── CommonLogics/      — 通用邏輯（沒有任何專案參考，實際未使用）
+  │   ├── FileLogics/        — 下載檔紀錄（FileDownload 表）
+  │   └── LCERPApiLogics/    — ★ 核心：ERP API 呼叫層（組路徑、管理 ERP token、檢查回應）
   │
   ├── Layer4（服務層）
-  │   ├── AuthServices/          — 使用者/角色/選單服務
-  │   ├── SSServices/            — 系統設定/事件日誌服務
-  │   ├── CustomerServices/      — 客戶/合約/諮詢/案件服務
-  │   ├── ProductServices/       — 產品服務
-  │   ├── CaseScenarioServices/  — 案件情境服務（含前台 FrontCaseScenario）
-  │   ├── FileServices/          — 檔案服務
-  │   ├── KeywordServices/       — 關鍵字服務
-  │   ├── NotificationServices/  — 通知服務
-  │   ├── QuestionnaireServices/ — 問卷服務
-  │   ├── CommonServices/        — 通用服務
-  │   ├── ExcelBuilderServices/  — Excel 匯出服務
-  │   └── NotificationCenter/    — 通知中心（Pool/Send + Email 發送）
+  │   ├── AuthServices/      — QR 登入 / JWT / 權限快取 / 選單 / 使用者下拉
+  │   ├── SSServices/        — 模組下拉 / 事件日誌查詢
+  │   ├── FileServices/      — 檔案下載
+  │   └── LCERPApiServices/  — ★ 核心：秤重業務服務（把 ERP 回應轉成前端格式）
+  │       ├── Weighing/      — 查詢暫收單、明細查詢 / 新增 / 刪除、送出、進貨退出、列印 PDF（8 個 Service）
+  │       └── Combo/         — ERP 下拉：箱籃 / 棧板 / 作物 / 品級 / 規格 / 倉庫（6 個 Service）
   │
   └── WebSite（主 Web 應用）
-      ├── Controllers/        — MVC Controllers（28 個）
-      ├── ApiControllers/     — API Controllers（35 個）
-      ├── Views/              — Razor Views（27 個功能模組，含前台 Front）
-      ├── Filters/            — 全域過濾器（Exception / Auth）
-      ├── Jobs/               — Hangfire 排程（通知 + 合約狀態）
-      ├── Swagger/            — 自訂 Swagger 快取提供者
-      ├── _Design/            — 後台 SCSS 樣式（Gulp 編譯）
-      ├── _Design_Front/      — 前台 SCSS 樣式（Gulp 編譯）
-      └── wwwroot/            — 靜態資源（JS/CSS/Images）
+      ├── Controllers/       — MVC Controllers（5 個檔：Home / Weighing / EventLog / Error 回 View，Selector 為空殼）
+      ├── ApiControllers/    — API Controllers（7 個檔、22 個端點；Common / Selector 為空殼，File 回傳 PDF）
+      ├── Views/             — Razor Views（Home / Weighing / EventLog / Error + Shared）
+      ├── Filters/           — 授權（AuthFilter / PermissionAuthorizationHandler）+ Hangfire Dashboard 存取限制
+      ├── Job/               — Hangfire 排程（ClearExpiredJWT）
+      ├── ViewComponents/    — BreadCrumbs / Menu / PageTitle
+      ├── Helpers/           — Kendo MVVM TagHelper
+      ├── ComboManage.cs     — Enum / 語系 / 系統功能 / 人員下拉
+      ├── _Design/           — 切版原始檔（SCSS + Gulp，輸出到 wwwroot）
+      └── wwwroot/           — 靜態資源（lib / js/pages / kioskToolHub.js / Enums / Resources）
 
-  test/
-  ├── ServiceLayer.Tests/     — 服務層測試
-  ├── AuthServices.Tests/     — 認證服務測試
-  └── CustomerLogics.Tests/   — 客戶邏輯測試
+  test/（方案資料夾）
+  ├── ServiceLayer.Tests/    — 測試基底（InMemory DbContext），0 個測試
+  └── AuthServices.Tests/    — 1 個測試（QRCodeSignIn）
+
+## 分層慣例（規範 vs 實況）
+
+    規範（.github/instructions/erp-api-integration.instructions.md、.github/copilot-instructions.md）
+    - ERP 串接五層：① LCERPApiLogics（含 ERP 回應 ViewModel）→ ② LCERPApiServices（轉 camelCase）
+      → ③ ApiControllers → ④ app.apis.js → ⑤ 頁面 JS / Views
+    - 一支 ERP API 對一個 Service；Controller 以 [FromServices] 注入、只做編排；每支端點掛 AuthFilter
+    - 下拉選單要經 ComboManage；ERP 回應的 Items 要做 null 檢查；ApiGuid 不可重用
+
+    實況（抽樣 3 條呼叫鏈）
+    - 秤重明細查詢：WeighingController.FindDetailsById → GetDocumentDetailsService
+      → LCERPApiLogic.GetDocumentDetails → LCApiLogic（發 HTTP GET）
+    - 秤重明細列印：WeighingController → AddWeighingDetailPrintService（查 ERP 明細 → Spire.Pdf 產 PDF
+      → FileDownloadLogic 寫 DB）→ 前端經 KioskTool 送印
+    - QR 登入：UserAuthController（AuthController.cs）→ UserAuthService.QRCodeSignIn
+      （呼叫 ERP KioskLogin，並直接用 DbContext 建立 User / LoginUesrJWT）
+
+    不一致處
+    - 規範說 LCERPApiLogics「呼叫 ERP」，實際發 HTTP 的是 LCApiLogics，五層圖沒有列出它
+    - ERP 下拉沒有經 ComboManage，而是 ComboController 直接注入 LCERPApiServices/Combo
+    - 5 支下拉 Service（Basket / Crop / Level / Pallet / Warehouse）與列印 Service 沒做 Items null 檢查（只有 Spec 有）
+    - ApiGuid.cs 有 3 處重用同一個 GUID
+    - Service 直接使用 DbContext（UserAuthService、SystemEventLogListService），規範沒有明文規定
+
+## 核心業務流程（分級秤重）
+
+    1. 起始頁 → QR 登入：從本機 KioskTool 取得 Kiosk 識別，掃碼槍讀員工個人 QR
+       → ERP AuthApi/KioskLogin 驗證（需 ERP「分級進貨(Client)」權限）→ 本系統簽發自己的 JWT
+    2. 查詢暫收單：輸入 / 掃描單號（GetDocumentByCode）或依日期前後切換（GetDocumentsByDate）
+    3. 選擇暫收單 → 進入分級秤重頁（載入既有秤重明細 GetDocumentDetails）
+    4. 選擇作物 → 品級 → 規格（三層連動，品級由 ERP 依作物設定回傳；選規格時自動帶入存入倉庫）
+    5. 秤重：重量由 KioskTool 即時推送磅秤讀值，數字鍵盤可手動覆寫；選擇棧板（只用於扣重）、箱籃與箱籃數（預設 1）
+       → 淨重 = 毛重 −（棧板重 + 箱籃重 × 箱籃數）→ 新增明細（「秤重」或「秤重並列印」）
+       （有疑似重複秤重提醒；連上磅秤時存檔後鎖定新增，磅秤回到 0 或手動改了重量才解鎖）
+    6. 列印：伺服器以 Spire.Pdf 產生每筆明細的標籤 PDF（含 QR 碼）→ 經 KioskTool 送印；
+       秤重明細頁可勾選多筆重印、刪除明細
+    7. 分級完成 →「送出分級結果」依序呼叫 CreatePurchaseReturn（新增進貨退出單）→ CommitDocument
+
+## ERP API 串接項目（LCERPApiLogics → ERP api/Version1/，共 14 支）
+
+    【AuthApi】KioskLogin（QR 登入）/ Logout
+    【PMGradedPurchase】
+    - GetDocumentsByDate / GetDocumentByCode（暫收單查詢）
+    - GetCrops / GetGradedProductLevels / GetGradedProductSpecs（作物 / 品級 / 規格）
+    - GetMetarialsByType（箱籃 / 棧板；ERP 端同樣拼作 Metarials）
+    - GetDocumentDetails / AddDocumentDetail / DeleteDocumentDetail（秤重明細查詢 / 新增 / 刪除）
+    - CommitDocument（送出分級結果）
+    - CreatePurchaseReturn（進貨退出）
+    【FMBDrop】GetWarehouseList（倉庫）
+    ※ ERP 位址依 Kiosk 而定：KioskHeaderMiddleware 讀 Kiosk-Guid → KioskMethod 查 KioskSetting 取得 erpUrl
 
 ## 主要功能模組
 
-  【客戶管理】客戶(Customer)、客戶公司(CustomerCompany)、員工(Employee)
-  【案件管理】客戶案件(CustomerIssue)、案件情境(CaseScenario)、案件分類(CaseScenarioClass)
-  【輔導服務】客戶諮詢(CustomerConsulting)
-  【合約專案】客戶合約(CustomerProject)、合約里程碑追蹤(ContractMilestoneTracking)
-  【產品管理】應用產品(AppProduct)
-  【通知系統】公告(Announcement)、通知中心(Notification)
-  【報表統計】報表(Report)、自訂表格(CustomGrid)
-  【問卷系統】問卷(Questionnaire)
-  【關鍵字】  關鍵字管理(Keyword)、搜尋關鍵字(SearchKeyword)
-  【前台入口】Front（客戶自助入口，含案件查詢）
-  【系統管理】使用者(User)、角色(Role)、系統設定(SysOption)、
-              事件日誌(EventLog)、意見回饋(Feedback)、
-              使用指南(UserGuide)、API Client 管理(ApiClient)
+  【分級進貨】Weighing — 核心功能，暫收單分級秤重（觸控介面 + 磅秤連線 + 數字鍵盤）；
+              不在選單 / 權限樹中，登入即可使用，首頁自動導向此功能
+  【系統使用紀錄】EventLog — 掛在「系統管理」選單下、需權限；使用後台版面（有側邊選單），
+              但 Kiosk 的秤重 / 首頁畫面沒有連到它的入口，實務上只能以網址進入
+  【首頁 / 登入】Home — 起始畫面 → QR 掃碼登入；登入後轉址到分級進貨（沒有 Dashboard）
+  【系統管理】選單定義了系統選單設定 / 角色權限設定 / 人員帳號設定，但對應的 Controller 與 View 不存在（範本殘留）
 
-## 5 層架構慣例（重要）
+  ▎ 選單與權限名稱定義在 Auths/Menu.cs、Module.cs（Menu_xxx / Module_xxx 資源鍵），
+    但 SharedResource.zh-Hant.resx 沒有這些鍵
 
-  1. View       — Razor Views + Kendo UI MVVM 綁定
-  2. Controller — 路由、參數解析（方法體 3~5 行）
-  3. Service    — 業務邏輯（商業規則在此層）
-  4. Logic      — 資料查詢/組裝
-  5. Domain/DbContext — EF Core 實體與資料庫
+## 架構特色（與 MESClient / CSS 共通模式）
 
-  ⚠ Controller 禁止包含業務邏輯，只做：參數驗證 → 調用 Service → 返回結果
+    - 4 層分層架構（Layer1~4），專案命名慣例相同
+    - DI 自動註冊：AddAutoDi("Logic") / AddAutoDi("Service")（類別與介面名稱都要以該字結尾，DLL 檔名也需含該字）
+    - EventAOP：AspectCore 只攔截 UserAuthService（記錄 QR 登入成功 / 失敗、登出）
+    - ComboManage：只管 Enum / 語系 / 系統功能 / 人員下拉；秤重用的 ERP 下拉不經過它
+    - T4 Template：Enum 同步到 JS（Domain.js / LC.Core.js / LCERPApiLogics.js）
+    - KioskHeaderMiddleware：讀 Kiosk-Guid header，決定這台 Kiosk 要連哪一台 ERP（本身不驗證、不拒絕請求）
+    - 本系統功能精簡，核心僅一個業務模組（分級進貨），其餘為共用基礎設施與範本殘留
 
 ## 開發重點注意
 
-  - DI 自動註冊：以 "Logic" / "Service" 結尾的類別自動掃描注入
-  - EventAOP 自動註冊：AddEventAOPAutoDi("Service") 自動掃描 AOP 攔截
-  - 多語系流程：修改 translations.csv → 執行 Exec-TT-Resources.ps1 → 生成 .resx + Resources.js
-  - Enum 同步：修改 C# Enum → 執行 Exec-TT-Domain.ps1 → 生成 Domain.js
-  - SCSS 編譯：後台 `_Design/gulp build-css`，前台 `_Design_Front/gulp build-css`
-  - 新功能開發四步驟：ApiGuid.cs → MenuAttr → AuthFilter → MenuLogics（不可省略）
-  - 強制 TDD：新增 Service 方法前先寫測試
-  - 開發治理：遵循 .specify/memory/constitution*.md 憲法文件
-  - 功能規格：specs/ 目錄存放各功能的需求規格
-
-
-# ERP-Web
-
-企業級 ERP 系統（農業 / 製造業），核心產品。規模極大。
-
-## 技術棧
-
-  ┌──────────────┬───────────────────────────────────────────────────┐
-  │ 項目         │ 內容                                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 框架         │ ASP.NET MVC 5.2.9 + Web API 5.2.9                │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 平台         │ .NET Framework 4.7.2（C# 7）                     │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ ORM          │ Entity Framework 6.2 + Dapper（混用）             │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 資料庫       │ SQL Server（1366 個 Entity 檔案）                 │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ DI           │ Unity Container 5.11                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 前端         │ Kendo UI + jQuery + Bootstrap + JS（ES5）         │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 認證         │ OWIN + JWT (jose-jwt) + WebMatrix Membership      │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 排程         │ Hangfire 1.8（大量排程任務）                       │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 快取         │ Redis (StackExchange) + System.Runtime.Caching    │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 即時通訊     │ SignalR 2.4（強制登出/進度/推播/時間 Hub）         │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 報表引擎     │ SSRS ReportViewer + QuestPDF + Spire PDF +        │
-  │              │   PDFsharp-MigraDoc（四套並存）                    │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ Excel        │ NPOI + Spire.Office                               │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 條碼         │ ZXing.Net + NBarCodes                             │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ OCR          │ Tesseract                                         │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 影音處理     │ MediaToolkit + FFMpeg                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 錯誤監控     │ Elmah + Elastic APM                                │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ API 文件     │ Swagger (Swashbuckle) + API 版本控制               │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 日誌         │ NLog                                               │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 多語系       │ translations.csv → T4/PowerShell → .resx           │
-  │              │   （繁中/簡中/英文，3MB+ 翻譯檔）                  │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 外部整合     │ LINE Messaging / Azure Email & Blob / SendGrid /  │
-  │              │   Google APIs / RestSharp / ECPay 電子發票          │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 計算引擎     │ NCalc（動態公式計算）                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 安全         │ Confuser（程式碼混淆）+ HTML 淨化(HtmlAgilityPack)│
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 測試         │ 單元測試 + Playwright E2E + CI Pipeline            │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 建構組態     │ Debug / Release / ITRI_Debug / ITRI_Release       │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 打包         │ BuildBundlerMinifier（CSS/JS 壓縮）               │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 產業         │ 農業 / 製造業                                     │
-  └──────────────┴───────────────────────────────────────────────────┘
-
-## Solution 分層結構（4 Level + 測試）
-
-  src/
-  ├── Level1（共用基礎）
-  │   └── Core/              — 共用工具、i18n 資源（.resx）
-  │
-  ├── Level2（資料/領域）
-  │   ├── DbContexts/        — EF6 資料模型（1366 個 Entity 檔案）
-  │   └── Domain/            — 領域模型、介面定義
-  │
-  ├── Level3（業務邏輯工具）
-  │   └── CustomFunctions/   — 自訂函式庫（SQL CLR 等）
-  │
-  ├── Level4（服務層，按業務模組拆分）
-  │   ├── FMBServices/       — 基本資料管理（產品/規格/倉庫）
-  │   ├── PMServices/        — 採購管理
-  │   ├── SMServices/        — 銷售管理
-  │   ├── QMServices/        — 品質管理
-  │   ├── FTBServices/       — 外貿/報關
-  │   ├── FABServices/       — 財務會計
-  │   ├── COServices/        — 成本計算
-  │   ├── SECServices/       — 資安管理
-  │   ├── AIServices/        — AI 服務
-  │   └── LineServices/      — LINE 整合
-  │
-  └── ERP/（主 Web 應用）
-      ├── App_Start/         — 啟動配置（Unity DI / Hangfire / Swagger / Auth）
-      ├── Controllers/       — 762 個 Controller 檔案（50 個模組目錄）
-      │   ├── Api/Version1/  — 對外 API（B2B / MES / LCEPM / 物流 / Agrigo）
-      │   ├── _SM/           — 銷售模組
-      │   ├── _PM/           — 採購模組
-      │   ├── _WM/           — 倉庫模組
-      │   ├── _PO/           — 生產模組
-      │   ├── _FAB/_FAS/_FR/ — 財務/固資/財報
-      │   ├── _CO/           — 成本模組
-      │   ├── _EI/           — 電子發票
-      │   ├── _BI/           — 基本資料
-      │   ├── _BS/           — 系統管理
-      │   ├── _Common/       — 共用（歷史/圖片/排程/通知）
-      │   └── ...（50 個模組）
-      ├── BLL/               — 業務邏輯層（167 個檔案）
-      │   ├── SM*/           — 銷售業務（訂單匯入多家通路）
-      │   ├── FA*/           — 財務業務（過帳/沖銷）
-      │   ├── PM*/           — 採購業務
-      │   ├── PO*/           — 生產業務
-      │   ├── WM*/           — 倉庫業務（進出/盤點/報廢/調撥）
-      │   ├── QM*/           — 品管業務
-      │   ├── Exports/       — 資料匯出
-      │   ├── ExternalSystem/ — 外部系統串接（LCEPM/TPI）
-      │   ├── GenericApi/    — 通用 API 介面
-      │   └── Report*/       — 報表/標籤列印
-      ├── Models/            — ViewModels
-      ├── Views/             — Razor Views（488 個模組目錄）
-      ├── Scripts/           — 前端 JavaScript
-      ├── Report/            — SSRS 報表（Builder/Filter/Model/Tool）
-      ├── QuestPdf/          — QuestPDF 報表/標籤引擎
-      ├── Excel/             — Excel 匯出工具
-      ├── SignalR/           — 即時通訊 Hub（強制登出/進度/推播）
-      ├── Filters/           — 動作過濾器
-      ├── Interceptors/      — 攔截器
-      ├── Timers/            — 定時器
-      └── Caches/            — 快取
-
-  test/
-  ├── ERPTests/              — 單元測試 + Playwright E2E
-  └── ERPTestsResources/     — 測試資源檔
-
-## 主要業務模組（50 個模組目錄，摘要）
-
-  【銷售】SM 銷售管理、SO 銷售單轉換、SD 配銷
-  【採購】PM 採購管理、DE 進貨費用
-  【生產】PO 生產管理、MES 製程執行、MRP 物料需求
-  【倉庫】WM 倉庫管理、PTM 產品追溯、TM 理貨
-  【財務】FAB 財會、FAS 固定資產、FR 財報、GL 總帳
-  【銀行】BA 銀行帳戶、AP 應付、AR 應收、BM 票據
-  【成本】CO 成本計算
-  【品管】QM 品質管理
-  【基本】BI 基本資料、FMB 產品基礎、BS 系統管理
-  【外貿】FTB 報關、TAX 稅務
-  【電商】AGO 農業電商(Agrigo)、APP 行動應用、GF 訂單轉換
-  【電子發票】EI 電子發票
-  【拍賣】AM 拍賣市場
-  【設備】EMR 設備維護
-  【餐飲】GM 菜單設計/營養/食譜
-  【零用金】CM 零用金管理
-  【介面】DI 資料介面映射
-  【物流】LM 物流、TR 運輸
-  【安全】SEC 資安管理
-  【分析】OLAP 分析、AI 智能服務
-  【外部】HM 農漁收成、ITRI 工研院、PC 價目表、PS 聯結
-  【報表】SR 報表發送
-  【系統】Web 系統入口
-
-## 外部系統整合
-
-  - Agrigo 農業交換平台（LJ.AgrigoExchangeLibrary）
-  - LCEPM 農業生產管理系統（收成/種植/包裝/出貨/種子銷售）
-  - MES 製造執行系統（製程紀錄/看板/任務/綜合報表）
-  - B2B 企業間交易（HKB2B 香港B2B + 通用B2B）
-  - 物流 TMS（棧板/拋轉/訂單/基礎資料）
-  - ECPay 電子發票（開立/折讓/管理）
-  - 通路訂單匯入（家樂福/Costco/全聯/7-11/全家/RT-Mart/Show Ba...）
-  - LINE Messaging 通知
-  - Azure（Email / Blob Storage）
-  - SendGrid 郵件
-  - Google APIs
-  - 區塊鏈（BlockChain）
-
-## 開發重點注意
-
-  ⚠ 新建任何檔案後，必須立即加入對應的 .csproj（舊式專案格式，不自動包含）
-  - Controller 檔 → ERP.csproj (<Compile>)
-  - View (.cshtml) → ERP.csproj (<Content>)
-  - Script (.js) → ERP.csproj (<Content>)
-  - Entity → DbContexts.csproj (<Compile>)
-
-  - 開發前查閱 .claude/rules/conventions-index.md 找到對應規範
-  - 規範文件：.specify/memory/conventions/（68+ 篇，涵蓋架構/Controller/前端/DB/服務/報表等）
-  - 知識文件：.specify/memory/knowledge/（17 篇，涵蓋銷售鏈/採購/生產/倉庫/追溯/理貨等）
-  - 模組對照：.mapping/controller_module_mapping.csv
-  - MCP 工具鏈：tools/ 下有 db-mcp、erp-db-mcp、excel-mcp、tfs-mcp
-  - CI Pipeline：erp-ci-with-e2e-tests.yml
-  - 多語系：修改 translations.csv → 執行 Exec-TT-Resources.ps1
-  - 分層慣例：Controller → BLL → Service → DbContext（Controller 僅編排，業務邏輯在 BLL/Service）
-  - ITRI 建構組態：工研院客製版本，獨立的 ITRI_Debug / ITRI_Release
-
-
-# HKLogistics
-
-物流配送管理系統 (Logistics Distribution Management System)，專注冷鏈/農產品配送，
-涵蓋派車排線、司機任務、寄倉管理、箱材庫存、運費結算。
-提供 Web 後台 + 行動端 API（司機 App / 管理者 App）雙介面。
-
-## 技術棧
-
-  ┌──────────────┬───────────────────────────────────────────────────┐
-  │ 項目         │ 內容                                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 框架         │ ASP.NET MVC 5 + Web API（API 版本控制）           │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 平台         │ .NET Framework 4.7.2（C# 7）                     │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ ORM          │ Entity Framework 6（T4 Template 生成 Entity）     │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 資料庫       │ SQL Server（Entity 由 DB.tt / DB.edmx 自動產生）  │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ DI           │ Unity Container 5.11                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 前端         │ Kendo UI + jQuery + Bootstrap                     │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 認證         │ JWT (jose-jwt) + WebMatrix Membership + OWIN      │
-  │              │   + AntiForgeryToken（自訂 Cookie 名稱 + Provider）│
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ API 認證     │ InterfaceApiAuthFilter（ERP 對接用）              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 排程         │ Hangfire（GPS 車機資料匯入 + 溫度異常偵測）       │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 即時通訊     │ SignalR（OWIN Startup）                           │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 錯誤監控     │ Elastic APM                                       │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ API 文件     │ Swagger (Swashbuckle) + API 版本控制               │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 日誌         │ NLog                                               │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 多語系       │ .resx（T4 Template 生成）                         │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ Excel 匯出   │ NPOI                                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 安全         │ CSP Headers + X-Frame-Options + 版本標頭移除      │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ GPS 整合     │ EUP 衛星犬車機 API（定時匯入 + 溫度警報）         │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ AI 功能      │ AI 路線規劃對話（AiRouteChatService）              │
-  │              │   + MCP 路線查詢服務（RouteMcpService）            │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ ERP 整合     │ 雙向同步（基本資料/產品對應/採購/理貨箱/棧板）     │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 測試         │ 單元測試 + GitHub Actions CI                      │
-  └──────────────┴───────────────────────────────────────────────────┘
-
-## Solution 結構
-
-  HKLogistics.sln
-  ├── HKLogistics/          — 主 Web 應用（單一專案，內含所有層級）
-  │   ├── App_Start/        — 啟動配置（Unity / Hangfire / Swagger / Auth / WebAPI）
-  │   ├── Controllers/      — MVC + API Controllers（14 個模組目錄）
-  │   │   ├── Api/Version1/ — 行動端 API（Driver / Manager / Consignment / DocumentSync）
-  │   │   ├── _VD/          — 派車管理
-  │   │   ├── _VM/          — 車輛管理
-  │   │   ├── _BI/          — 基本資料
-  │   │   ├── _FD/          — 寄倉管理
-  │   │   ├── _BM/          — 箱材管理
-  │   │   ├── _SR/          — 報表（配送/寄倉/箱材，多個子模組）
-  │   │   ├── _BS/          — 系統管理
-  │   │   ├── _PS/          — 個人設定
-  │   │   ├── _Common/      — 共用（GPS匯入/歷史/多語/排程/檔案）
-  │   │   ├── _Web/         — Dashboard / 通知 / 驗證碼
-  │   │   ├── SD/           — 運費管理
-  │   │   ├── LightBox/     — 彈窗元件
-  │   │   └── shinagri/     — 新農業入口
-  │   ├── BLL/              — 業務邏輯（22 個檔案）
-  │   │   ├── AssignCarRoute* — 派車排線核心（含 AI 路線規劃）
-  │   │   ├── OrderBll       — 訂單管理
-  │   │   ├── MessageBll     — 訊息通知
-  │   │   ├── CallErp*Bll    — ERP API 呼叫
-  │   │   ├── SortingBoxPalletBll — 理貨箱/棧板
-  │   │   ├── AiRouteChatService  — AI 對話服務
-  │   │   └── RouteMcpService     — MCP 路線查詢
-  │   ├── Models/            — EF6 Entity（T4 自動生成）+ ViewModel
-  │   │   ├── DB.tt/DB.edmx  — T4 模板 → Entity 自動生成
-  │   │   ├── _Api/          — API 回應模型（JWT/Paging/Response）
-  │   │   ├── _Auth/         — 權限模型（Menu/Permission）
-  │   │   ├── _Data/         — 共用數據模型（Enum/Grid/Tree）
-  │   │   └── _Entity/       — 手動擴展的 Entity partial class
-  │   ├── Inventory/         — 庫存異動引擎（13 種單據類型）
-  │   ├── EupAPI/            — 衛星犬 GPS 車機 API 串接
-  │   ├── SignalR/           — 即時通訊
-  │   ├── Report/            — Excel 報表（ExcelBuilder + ExcelTools）
-  │   ├── Filters/           — 過濾器（Auth/API Auth/Swagger/Timing/Dashboard）
-  │   ├── Views/             — Razor Views
-  │   ├── Scripts/           — 前端 JavaScript
-  │   ├── _Core/             — 共用工具（Extensions/Loggers/Paging/Security）
-  │   ├── Resources/         — 多語系（.resx + T4 Template）
-  │   └── Templates/         — 郵件範本
-  │
-  ├── HKLogistics.ERP/       — ERP 整合專案（目前空殼）
-  │
-  └── HKLogistics.Test/      — 測試專案
-      ├── Controllers/_VD/   — 路線規劃（VDAssignCarRouteController）測試
-      ├── Controllers/Api/   — API 測試
-      └── BLL/               — BLL 測試
-
-## 主要業務模組
-
-  【派車排線】VD - 派車(AssignCar)、路線規劃(AssignCarRoute)、
-              出貨單(DeliveryOrder)、外掛任務(PluginTask)、
-              任務訊息(TaskMessage)、司機費用結算(DriverCostSettle)、
-              司機重量結算(DriverWeightSettle)、司機任務檢視(DriverTaskView)
-  【車輛管理】VM - 車檢(CarCheck)、油費(CarOil)、車輛警示(CarWarn)、
-              車輛保養(CarMaintenance)、司機排班(DriverSchedule)、
-              司機請假(DriverLeaveApplication)
-  【寄倉管理】FD - 寄倉廠商(ConsignmentFirm)、寄倉訂單(ConsignmentOrder)、
-              寄倉營收(ConsignmentRevenue)、寄倉成本設定(ConsignmentCostSetting)
-  【箱材管理】BM - 箱材庫存(BoxStock)、箱材出退(BoxShipReturn)、
-              箱材調整(BoxAdjustment)、箱材結算(BoxSettle)
-  【運費管理】SD - 運費(FreightFee)、運費設定(FreightFeeSetting)、
-              運費供應商(FreightSupplier)
-  【基本資料】BI - 車輛(Car)、司機(Driver)、配送點(DeliveryPoint)、
-              送貨路線(DeliveryRoute)、寄貨門市(DeliveryStore)、
-              箱材(BoxMaterials)、運費類型(FreightType)、
-              司機費用設定(DriverCostSetting)、ERP 產品/供應商 對應
-  【報表統計】SR - 每日派車、司機費用月報、配送點派車、
-              司機重量月報、外掛任務回單、箱材退回、寄倉統計
-  【系統管理】BS - 角色/帳號/系統參數/系統日誌/系統選項
-  【ERP 同步】DocumentSync - 基本資料/產品對應/採購/理貨箱/棧板
-
-## 行動端 API（Api/Version1/）
-
-  【司機端】Driver - 任務詳情、箱材領取/歸還、出車檢查、棧板(拉取/裝卸/理貨)、
-                     油費回報、警示通知、出勤/請假
-  【管理者】Manager - 出貨單管理、外掛任務指派、任務訊息、寄倉訂單、
-                      箱材管理、通知、請假審核
-  【寄倉端】Consignment - 寄倉訂單/任務/箱材
-  【共用】Auth / Files / EUP(GPS) / Personal / MCP Route / Notice
-
-## 庫存異動引擎（Inventory）
-
-  13 種單據類型，繼承 StNumDocBase → StNumDocProcess，自動處理庫存增減：
-  - 司機任務材料、司機領料出庫、司機退回公司
-  - 管理者收料、寄倉收貨、寄倉取貨
-  - 箱材出退（出庫/收回）、庫存調整（入/出）
-
-## 開發重點注意
-
-  ⚠ 新建任何檔案後，必須立即加入 HKLogistics.csproj（舊式專案格式）
-  - Entity 由 T4 Template (DB.tt + DB.edmx) 自動生成，手動擴展用 _Entity/ partial class
-  - 庫存異動統一走 Inventory 引擎，不直接操作 ST_Stock 表
-  - 行動端 API 統一繼承 _BaseApiController
-  - MVC Controller 繼承 BaseController / BaseManageController
-  - GPS 資料定時排程匯入（EUP 衛星犬，每 2 分鐘）
-  - ERP 雙向同步透過 DocumentSync API + CallErpApiBll
-  - AI 路線規劃：AiRouteChatService（AI 對話）+ RouteMcpService（MCP API）
-  - CI：GitHub Actions（路線規劃測試），本地執行 build/Run-VDAssignCarRouteControllerTests.ps1
-  - BLL 中核心邏輯檔案極大（AssignCarRouteBll 133KB、AssignCarRouteCommandBll 76KB）
-
-
-# LXKiosk
-
-農產品分級秤重 Kiosk 系統，專為現場操作員設計的觸控式終端應用。
-透過 API 串接 ERP 系統，實現農產品暫收 → 分級 → 秤重 → 送出/退貨 的完整作業流程。
-
-## 技術棧
-
-  ┌──────────────┬───────────────────────────────────────────────────┐
-  │ 項目         │ 內容                                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 框架         │ ASP.NET Core MVC + Web API（混合）                │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 平台         │ .NET 7                                            │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ ORM          │ Entity Framework Core 7 + SQL Server              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ DI/AOP       │ 自動註冊(AddAutoDi) + AspectCore（EventAOP）      │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 前端         │ Kendo UI（MVVM）+ jQuery + Bootstrap              │
-  │              │   （觸控式 UI，含數字鍵盤元件）                    │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 認證         │ JWT + DataProtection（Keys 存入 DbContext）       │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 安全         │ AntiXss Middleware + RateLimiting + CSP / HSTS /  │
-  │              │   X-Frame-Options / X-XSS-Protection              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 排程         │ Hangfire（JWT 過期清理）                           │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 快取         │ Redis (StackExchange) / 可退回 MemoryCache        │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 錯誤監控     │ Elastic APM                                       │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ API 文件     │ Swagger (Swashbuckle)                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 日誌         │ NLog（寫入 DB）+ JSNLog（前端→後端）              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 程式碼生成   │ T4 模板（Enum → Domain.js / LC.Core.js /          │
-  │              │   LCERPApiLogics.js + Resources.js）               │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 前端樣式     │ _Design（SCSS 編譯）                              │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 中介軟體     │ KioskHeaderMiddleware（Kiosk 識別）                │
-  │              │   + CultureMiddleware + RateLimitingMiddleware     │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ ERP 整合     │ LCERPApiLogics（串接 ERP PMGradedPurchase API）   │
-  ├──────────────┼───────────────────────────────────────────────────┤
-  │ 環境         │ appsettings：Production / QA / Staging            │
-  └──────────────┴───────────────────────────────────────────────────┘
-
-## Solution 分層結構（4 Layer + 測試）
-
-  src/
-  ├── Layer1（共用基礎）
-  │   ├── LC.Core/           — 共用工具、Filters、Authentication、Middlewares
-  │   └── Resource/          — .resx 多語系資源檔
-  │
-  ├── Layer2（資料/領域）
-  │   ├── Domain/            — Entities、Enums、AOP、Middlewares、ViewModels
-  │   ├── DbContexts/        — EF Core LXKioskDbContext + Migrations
-  │   ├── Auths/             — 模組權限定義（Module Tool）
-  │   └── LCApiLogics/       — LC共用 API 串接邏輯
-  │
-  ├── Layer3（業務邏輯）
-  │   ├── MenuLogics/        — 選單邏輯
-  │   ├── ModuleLogics/      — 模組邏輯
-  │   ├── ComboLogics/       — 下拉選單邏輯
-  │   ├── CommonLogics/      — 通用邏輯
-  │   ├── FileLogics/        — 檔案邏輯
-  │   └── LCERPApiLogics/    — ★ 核心：ERP API 串接邏輯（秤重/暫收/分級）
-  │
-  ├── Layer4（服務層）
-  │   ├── AuthServices/      — 使用者/權限服務
-  │   ├── SSServices/        — 系統設定/事件日誌服務
-  │   ├── FileServices/      — 檔案服務
-  │   └── LCERPApiServices/  — ★ 核心：秤重業務服務
-  │       ├── Weighing/      — 秤重明細 CRUD + 列印 + 送出 + 退貨
-  │       └── Combo/         — ERP 下拉資料代理
-  │
-  └── WebSite（主 Web 應用）
-      ├── Controllers/       — MVC Controllers（5 個）
-      ├── ApiControllers/    — API Controllers（7 個）
-      ├── Views/             — Razor Views（5 個模組）
-      ├── Filters/           — 過濾器（Exception / Auth / HangfireDashboard）
-      ├── Job/               — Hangfire 排程（JWT 清理）
-      ├── ViewComponents/    — View Components
-      ├── _Design/           — SCSS 樣式
-      └── wwwroot/           — 靜態資源（JS/CSS/Enums/Resources）
-
-  test/
-  ├── ServiceLayer.Tests/    — 服務層測試
-  └── AuthServices.Tests/    — 認證服務測試
-
-## 核心業務流程（秤重作業）
-
-  1. Kiosk 登入 → 透過 ERP API KioskLogin 取得 Token
-  2. 查詢暫收單（掃描條碼 or 依日期查詢）
-  3. 選擇暫收單 → 進入分級秤重介面
-  4. 選擇作物 → 選擇品級(A/B+/B/C/D) → 選擇規格
-  5. 秤重（觸控數字鍵盤輸入）→ 選擇箱籃/棧板 → 新增明細
-  6. 列印秤重明細
-  7. 送出分級結果 / 新增進貨退出單
-
-## ERP API 串接項目（LCERPApiLogics → ERP PMGradedPurchase API）
-
-  - Login / Logout（Kiosk 認證）
-  - GetDocumentsByDate / GetDocumentsByCode（暫收單查詢）
-  - GetCrops / GetGradedProductLevels / GetGradedProductSpecs（作物/品級/規格）
-  - GetMetarialsByType（箱籃/棧板）
-  - GetWarehouses（倉庫）
-  - GetDocumentDetails / AddDocumentDetail / DelDocumentDetails（秤重明細 CRUD）
-  - CommitDocument（送出分級結果）
-  - CreatePurchaseReturn（進貨退出）
-
-## 主要功能模組
-
-  【秤重作業】Weighing — 核心功能，暫收單分級秤重（觸控介面 + 數字鍵盤）
-  【事件日誌】EventLog — 系統操作紀錄
-  【首頁】    Home — Dashboard / 登入
-  【系統管理】共用帳號/權限管理（透過 AuthServices）
-
-## 架構特色（與 MESClient/CSS 共通模式）
-
-  - 4 層分層架構（Layer1~4），專案命名慣例相同
-  - DI 自動註冊：AddAutoDi("Logic") / AddAutoDi("Service")
-  - EventAOP：AspectCore 攔截 UserAuthService
-  - ComboManage：統一管理下拉選單資料源
-  - T4 Template：Enum 同步到 JS（Domain.js / LC.Core.js / LCERPApiLogics.js）
-  - KioskHeaderMiddleware：辨識 Kiosk 裝置的專用 Middleware
-  - 本系統功能精簡，核心僅一個業務模組（秤重），其餘皆為共用基礎設施
-
-## 開發重點注意
-
-  - 此系統不直接操作 ERP 資料庫，所有業務資料透過 ERP API 取得/操作
-  - LCERPApiLogics 是核心串接層，包裝 ERP PMGradedPurchase API
-  - LCERPApiServices/Weighing 是核心服務層，實現秤重作業流程
-  - 前端為觸控式設計，有自訂數字鍵盤元件（_partial_numeric_keyboard）
-  - Kiosk 認證流程獨立於一般使用者：使用 GUID + SessionId 登入 ERP
-  - 環境設定分 Production / QA / Staging 三套
-  - Migration.sql 會在部署時複製到輸出目錄
-
+    - 此系統不直接操作 ERP 資料庫，業務資料全部透過 ERP API；自有 DB 只存使用者 / 權限 / JWT / Kiosk 設定 /
+      下載檔紀錄 / 事件與稽核紀錄 / DataProtection key，以及 Hangfire 的資料表
+    - LCERPApiLogics 組 ERP 路徑並管理 ERP token（快取 + LoginUesrJWT 表），實際 HTTP 由 LCApiLogics 發送
+    - LCERPApiServices/Weighing 是核心服務層；Combo 提供 ERP 下拉
+    - 前端為觸控式設計：自訂數字鍵盤（Views/Weighing/_partial_numeric_keyboard + weighing.numerickeyboard.js），
+      用來手動覆寫磅秤讀值
+    - 現場設備依賴本機 KioskTool（SignalR Hub，網址設定 AppSettings:KioskToolUrl）：取 Kiosk 識別、推送磅秤讀值、接收列印
+    - Kiosk 登入：員工個人 QR 內容（guid）+ 瀏覽器固定的 sessionId 呼叫 ERP KioskLogin；
+      本系統 JWT 存 localStorage + Cookie
+    - 弱點掃描用設定：設了 VulnerabilityScanKioskGuid / VulnerabilityScanLoginQRCode 時，會覆寫 Kiosk 識別並可免掃碼登入
+      （目前各環境都未設定；正式環境不可設定）
+    - 環境設定：appsettings.json + Production / QA / Staging（KioskToolUrl 只在 Production、QA 有設定）
+    - Migration.sql 設定為部署時複製到輸出目錄，但目前是空檔，也沒有程式執行它
+    - 開發規範：.github/copilot-instructions.md + .github/instructions/（4 份）；CLAUDE.md / AGENTS.md 為 AI 工具入口
 
 (非負責專案)
-# LCEPM-master (LCEPM)
+# RD2018002_LCEPM-master (LCEPM)
 
 農業生產管理系統 (Enterprise Plant Management)，涵蓋種苗培育、種植管理、
 收成處理、包裝出貨、感測器監控、碳足跡盤查、ESG 報告等農業全生命週期管理。
@@ -788,7 +1135,7 @@ MES（製造執行系統）Client 端，前後端同在一個 Web 專案中。
   ├── Level2（資料/領域）
   │   ├── Domain/             — Entities、Enums、ViewModels
   │   ├── DbContexts/         — EF Core DbContext + Migrations
-  │   └── LCApiLogics/        — LC共用 API 串接
+  │   └── LCApiLogics/        — 凌聚共用 API 串接
   │
   ├── Level3（業務邏輯 / 管理服務）
   │   ├── Service.Manage/     — 後台管理業務（CRUD 為主）
