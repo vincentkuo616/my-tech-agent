@@ -54,3 +54,11 @@ jobs:
         git add reports/
         git commit -m "Auto-generated technical report $(date +'%Y-%m-%d')" || exit 0
         git push
+        
+    - name: Sync reports to Google Drive
+      uses: adityak74/google-drive-upload-git-action@main
+      with:
+        credentials: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+        filename: reports/*.md
+        folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
+        overwrite: true
